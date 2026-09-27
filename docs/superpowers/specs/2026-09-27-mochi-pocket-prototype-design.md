@@ -64,7 +64,6 @@ Success means a user can drag supported content onto Mochi, receive immediate vi
 - arbitrary URI schemes;
 - file-content previews;
 - a generic Mochi utility/plugin framework;
-- new animation assets;
 - new sound assets.
 
 ## Existing runtime constraints
@@ -379,7 +378,9 @@ My paws are full
 
 Do not create a parallel Pocket behavior state machine.
 
-The preferred implementation is to reuse the existing `EXCITED` reaction as the receive animation while adding one narrow transition-policy entry point for Pocket/direct receive ownership.
+Pocket will use a dedicated receive animation asset supplied separately for this feature. The animation is presentation only; it does not introduce a new behavior-state machine or independent lifecycle. The implementation should map the Pocket receive interaction onto one narrow direct-interaction transition path, then play the dedicated Pocket animation through Mochi’s existing animation system.
+
+Until the final asset is integrated, tests may use a stub/test animation name or fixture, but production completion requires the supplied Pocket receive asset to be present in the animation manifest and packaging.
 
 The implementation should follow the existing feeding pattern:
 
@@ -673,7 +674,10 @@ Integration changes are expected to remain narrow in existing files, primarily a
 src/mochi/behavior.py
 src/mochi/presence/click_dialogue.py   # composition/menu integration location may vary
 src/mochi/app.py or Buddy construction # only if dependency ownership requires it
+src/mochi/sprites.py and/or animation manifest integration for the Pocket receive asset
 ```
+
+The provided Pocket receive animation asset must be validated against Mochi’s existing sprite-manifest conventions and included by the normal packaging path. Pocket should not create a one-off asset loader.
 
 Tests are expected under focused `tests/test_pocket*.py` modules plus small regression additions to existing state/menu architecture tests where appropriate.
 
@@ -695,7 +699,7 @@ Implemented by adapter validation and feedback without store mutation.
 
 ### A received-item animation/reaction plays without breaking the state machine
 
-Implemented by one existing excited reaction through the central transition policy and normal resume path.
+Implemented by the dedicated Pocket receive animation through the central transition policy and normal resume path.
 
 ### Pocket contents can be viewed, opened, and removed
 
@@ -723,6 +727,6 @@ The reviewed design decisions are:
 - multi-file drops are transactional;
 - one external drop triggers one receive reaction;
 - protected direct/lifecycle states reject Pocket receive;
-- existing excited animation is reused;
+- a dedicated Pocket receive animation asset is supplied and integrated through Mochi’s existing sprite/animation pipeline;
 - Pocket persistence is separate from `ConfigStore`;
 - no generic utility framework is introduced in this issue.
