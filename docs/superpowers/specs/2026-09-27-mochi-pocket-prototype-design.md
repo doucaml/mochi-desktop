@@ -142,7 +142,7 @@ Pocket data lives under Mochi’s XDG data directory rather than `config.json`.
 Conceptual location:
 
 ```text
-$XDG_DATA_HOME/mochi/pocket/
+$XDG_DATA_HOME/mochi-desktop/pocket/
     pocket.json
     images/
 ```
@@ -315,14 +315,15 @@ For a supported drop:
 
 1. classify and validate the full batch;
 2. verify Mochi’s current behavior can accept the interaction;
-3. prepare any managed raw-image file through a temporary path;
-4. construct the complete candidate Pocket state;
+3. write any managed raw image to a temporary file, then atomically move it to its final Pocket-managed path;
+4. construct the complete candidate Pocket state referencing that final managed path;
 5. write candidate JSON through temporary-file replacement;
-6. publish the live in-memory Pocket only after persistence succeeds;
-7. clean up successfully evicted managed images;
-8. record direct user interaction;
-9. play one existing excited receive reaction;
-10. recover through Mochi’s normal reaction/ambient-resume path.
+6. if JSON persistence fails, remove any newly finalized managed image from this failed transaction;
+7. publish the live in-memory Pocket only after persistence succeeds;
+8. clean up successfully evicted managed images;
+9. record direct user interaction;
+10. play one existing excited receive reaction;
+11. recover through Mochi’s normal reaction/ambient-resume path.
 
 The drop is reported successful only after persistence succeeds.
 
@@ -457,19 +458,20 @@ Pocket mutations are transactional at the JSON metadata boundary.
 ### Add transaction
 
 1. classify/validate;
-2. write managed raw image to a temporary file if needed;
-3. calculate candidate Pocket state;
-4. write candidate JSON to a temporary file;
-5. atomically replace the old JSON;
-6. publish the new in-memory state;
-7. delete evicted managed images;
-8. finalize/retain the managed raw image.
+2. write a managed raw image to a temporary file if needed;
+3. atomically move that image to its final Pocket-managed path;
+4. calculate candidate Pocket state using the final managed path;
+5. write candidate JSON to a temporary file;
+6. atomically replace the old JSON;
+7. publish the new in-memory state;
+8. delete evicted managed images.
 
 If JSON persistence fails:
 
 - previous JSON remains authoritative;
 - previous in-memory Pocket remains active;
 - temporary files are cleaned;
+- any newly finalized managed image created for the failed transaction is deleted;
 - no receive reaction plays;
 - the drop reports failure.
 
@@ -488,9 +490,10 @@ If managed-image deletion fails after metadata persistence, log the failure but 
 - log the problem;
 - preserve the corrupt file;
 - load an empty in-memory Pocket;
-- do not overwrite the corrupt file merely because startup occurred.
+- do not overwrite the corrupt file merely because startup occurred;
+- on the first later user-initiated successful Pocket mutation, atomically move the corrupt file to a timestamped `pocket.corrupt-<timestamp>.json` backup before writing a fresh `pocket.json`.
 
-A later explicit successful write may require a deliberate recovery path rather than silently clobbering evidence.
+If preserving the corrupt file fails, reject that mutation instead of destroying the only diagnostic copy.
 
 **Malformed individual records**
 - skip malformed records;
