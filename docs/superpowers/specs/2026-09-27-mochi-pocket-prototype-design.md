@@ -321,7 +321,7 @@ For a supported drop:
 7. publish the live in-memory Pocket only after persistence succeeds;
 8. clean up successfully evicted managed images;
 9. record direct user interaction;
-10. play one existing excited receive reaction;
+10. play the dedicated Pocket receive animation;
 11. recover through Mochi’s normal reaction/ambient-resume path.
 
 The drop is reported successful only after persistence succeeds.
