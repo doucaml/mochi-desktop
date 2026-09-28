@@ -258,6 +258,21 @@
       "fps": 8.333333333333334,
       "loop": false
     },
+    "pocket_grab": {
+      "frames": [
+        "pocket_grab/mochi_pocket_grab_0001.png",
+        "pocket_grab/mochi_pocket_grab_0002.png",
+        "pocket_grab/mochi_pocket_grab_0003.png",
+        "pocket_grab/mochi_pocket_grab_0004.png",
+        "pocket_grab/mochi_pocket_grab_0005.png",
+        "pocket_grab/mochi_pocket_grab_0006.png",
+        "pocket_grab/mochi_pocket_grab_0007.png",
+        "pocket_grab/mochi_pocket_grab_0008.png"
+      ],
+      "frame_count": 8,
+      "fps": 8.333333333333334,
+      "loop": false
+    },
     "computer": {
       "frames": [
         "computer/computer_01.png",

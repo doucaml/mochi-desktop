@@ -76,6 +76,24 @@ Use this checklist for interaction/state changes and before release checkpoints.
 - [ ] Interrupted/stale feed completion does not award progress or fire completion behavior
 - [ ] Feed → heart → idle leaves click/right-click/drag usable
 
+## Pocket
+
+- [ ] A supported drag starts the open-mouth loop before release
+- [ ] Repeated drag motion does not restart the Pocket loop
+- [ ] Leaving or cancelling restores idle or the current ambient presentation
+- [ ] Sleep, wake, pickup, drag, Fedora, and direct reactions reject Pocket hover
+- [ ] A successful release plays only the closing tail after persistence
+- [ ] Failed persistence restores presentation and leaves prior contents intact
+- [ ] GNOME Files supports one file, one directory, and a multi-file batch
+- [ ] Browser drags distinguish HTTP(S) links, selected text, and image textures
+- [ ] Editor text drops preserve multiline content
+- [ ] `Pocket · N` updates after add, eviction, and removal
+- [ ] Missing original files remain visible as unavailable
+- [ ] Open/View uses the safe default application or read-only text window
+- [ ] Removing an item never deletes an original dropped file
+- [ ] Closing/reopening both Pocket and its context-menu path remains usable
+- [ ] Restarting Mochi restores the ten most recent persisted items
+
 ## Emote Catalogue
 
 - [ ] Catalogue opens from the normal UI path

@@ -61,6 +61,146 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertEqual(pickup.frame_duration_ms, PICKUP_FRAME_DURATION_MS)
         self.assertFalse(pickup.looping)
 
+    def test_pocket_grab_is_an_eight_frame_one_shot(self) -> None:
+        pocket_grab = ANIMATIONS["pocket_grab"]
+
+        self.assertEqual(len(pocket_grab.frames), 8)
+        self.assertEqual(pocket_grab.frame_duration_ms, 120)
+        self.assertFalse(pocket_grab.looping)
+        self.assertEqual(
+            set(ASSET_SET.load_frames("pocket_grab")),
+            {
+                f"pocket_grab/mochi_pocket_grab_{index:04}.png"
+                for index in range(1, 9)
+            },
+        )
+
+    def test_pocket_hover_loops_the_open_mouth_middle_frames(self) -> None:
+        hover = ANIMATIONS["pocket_hover"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in hover.frames),
+            tuple(
+                f"pocket_grab/mochi_pocket_grab_{index:04}.png"
+                for index in (4, 5, 6, 7, 6, 5)
+            ),
+        )
+        self.assertEqual(hover.frame_duration_ms, 120)
+        self.assertTrue(hover.looping)
+        self.assertIsNone(hover.next_state)
+
+    def test_pocket_finish_closes_without_restarting_the_full_animation(self) -> None:
+        finish = ANIMATIONS["pocket_finish"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in finish.frames),
+            (
+                "pocket_grab/mochi_pocket_grab_0007.png",
+                "pocket_grab/mochi_pocket_grab_0008.png",
+            ),
+        )
+        self.assertEqual(finish.frame_duration_ms, 120)
+        self.assertFalse(finish.looping)
+        self.assertEqual(finish.next_state, "idle")
+
+    def test_pocket_glow_paints_a_translucent_effect_for_the_current_frame(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        context = cairo.Context(surface)
+
+        atlas.draw_glow(context, frame, 256, 256, pulse=0.5)
+        surface.flush()
+
+        self.assertTrue(any(bytes(surface.get_data())))
+
+    def test_pocket_glow_breathes_brighter_and_wider_at_peak_pulse(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+
+        low = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        atlas.draw_glow(cairo.Context(low), frame, 256, 256, pulse=0.0)
+        low.flush()
+
+        high = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        atlas.draw_glow(cairo.Context(high), frame, 256, 256, pulse=1.0)
+        high.flush()
+
+        self.assertGreater(
+            sum(bytes(high.get_data())),
+            sum(bytes(low.get_data())),
+        )
+
+
+    def test_pocket_glow_is_fully_transparent_before_small_widget_edges(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        size = 112
+        margin = 8
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+
+        atlas.draw_glow(cairo.Context(surface), frame, size, size, pulse=1.0)
+        surface.flush()
+
+        data = bytes(surface.get_data())
+        stride = surface.get_stride()
+        self.assertTrue(any(data))
+
+        for y in range(size):
+            row = data[y * stride : (y + 1) * stride]
+            if y < margin or y >= size - margin:
+                self.assertFalse(any(row))
+                continue
+            self.assertFalse(any(row[: margin * 4]))
+            self.assertFalse(any(row[(size - margin) * 4 : size * 4]))
+
+
+    def test_pocket_glow_remains_visible_around_transparent_sprite_pixels(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        size = 112
+
+        glow = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        atlas.draw_glow(cairo.Context(glow), frame, size, size, pulse=1.0)
+        glow.flush()
+
+        sprite = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        atlas.draw(cairo.Context(sprite), frame, size, size)
+        sprite.flush()
+
+        glow_data = bytes(glow.get_data())
+        sprite_data = bytes(sprite.get_data())
+        glow_stride = glow.get_stride()
+        sprite_stride = sprite.get_stride()
+
+        visible_halo_pixel = False
+        for py in range(size):
+            for px in range(size):
+                glow_pixel = glow_data[
+                    py * glow_stride + px * 4 : py * glow_stride + (px + 1) * 4
+                ]
+                sprite_pixel = sprite_data[
+                    py * sprite_stride + px * 4 : py * sprite_stride + (px + 1) * 4
+                ]
+                if any(glow_pixel) and not any(sprite_pixel):
+                    visible_halo_pixel = True
+                    break
+            if visible_halo_pixel:
+                break
+
+        self.assertTrue(visible_halo_pixel)
+
+    def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        with (project_root / "pyproject.toml").open("rb") as stream:
+            pyproject = tomllib.load(stream)
+
+        data_files = pyproject["tool"]["setuptools"]["data-files"]
+        self.assertEqual(
+            data_files["share/mochi/pocket_grab"],
+            ["assets/mochi/pocket_grab/*.png"],
+        )
+
     def test_drop_is_a_quick_six_frame_one_shot(self) -> None:
         drop = ANIMATIONS["drop"]
         self.assertEqual(len(drop.frames), 6)

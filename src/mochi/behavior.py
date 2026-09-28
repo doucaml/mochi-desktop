@@ -27,6 +27,20 @@ REACTION_STATES = CLICK_REACTION_STATES | frozenset(
     )
 )
 
+POCKET_RECEIVE_STATES = frozenset(
+    (
+        MochiState.IDLE,
+        MochiState.BLINKING,
+        MochiState.IDLE_EMOTE,
+        MochiState.WALKING,
+        MochiState.COMPUTER,
+        MochiState.TYPING,
+        MochiState.WATCHING,
+        MochiState.DANCING,
+        MochiState.SEARCHING,
+    )
+)
+
 
 def can_start_click_reaction(state: MochiState) -> bool:
     return state is MochiState.IDLE
@@ -42,6 +56,11 @@ def can_begin_sleep(state: MochiState) -> bool:
 
 def can_begin_wake(state: MochiState) -> bool:
     return state is MochiState.SLEEPING
+
+
+def can_start_pocket_receive(state: MochiState) -> bool:
+    """Return whether direct Pocket input may claim Mochi's presentation."""
+    return state in POCKET_RECEIVE_STATES
 
 
 def can_transition(current: MochiState, requested: MochiState) -> bool:
@@ -80,6 +99,11 @@ def can_transition(current: MochiState, requested: MochiState) -> bool:
             MochiState.DROPPING,
             MochiState.FEDORA,
         )
+    if requested is MochiState.EXCITED:
+        # EXCITED is the narrow shared state used by Pocket's direct receive
+        # reaction. It may interrupt ambient presentation, but never lifecycle,
+        # held, Fedora, or another direct-interaction owner.
+        return can_start_pocket_receive(current)
     if current is MochiState.WAKING:
         return False
     if requested is MochiState.WAKING:

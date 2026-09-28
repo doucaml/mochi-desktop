@@ -8,6 +8,11 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 
 ### Added
 
+- Added **Mochi Pocket**, a local-first ten-item shelf for files, directories,
+  text, HTTP(S) links, and dropped images. Supported drags now make Mochi loop
+  an open-mouth preview before release, then close his mouth only after the
+  item is safely persisted. Pocket contents can be opened, viewed, or removed
+  from the new `Pocket · N` context-menu window.
 - Added a polished **Mochi Update Service** for installed alpha builds. Mochi can
   quietly detect newer `main` commits, announce an available update once, show
   a compact GTK **What's new** window using real Mochi pixel art, and update
