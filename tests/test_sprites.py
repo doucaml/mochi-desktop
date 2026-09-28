@@ -103,6 +103,17 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertFalse(finish.looping)
         self.assertEqual(finish.next_state, "idle")
 
+    def test_pocket_glow_paints_a_translucent_effect_for_the_current_frame(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        context = cairo.Context(surface)
+
+        atlas.draw_glow(context, frame, 256, 256)
+        surface.flush()
+
+        self.assertTrue(any(bytes(surface.get_data())))
+
     def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
         with (project_root / "pyproject.toml").open("rb") as stream:
