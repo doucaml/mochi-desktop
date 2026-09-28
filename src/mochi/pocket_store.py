@@ -105,6 +105,15 @@ class PocketStore:
             self._delete_managed_image(Path(target.value))
         return remaining
 
+    def clear(self, current: Iterable[PocketItem]) -> list[PocketItem]:
+        """Persist an empty Pocket before cleaning up Mochi-managed images."""
+        current_items = list(current)
+        self._save_items(())
+        for item in current_items:
+            if item.kind is PocketItemKind.SAVED_IMAGE:
+                self._delete_managed_image(Path(item.value))
+        return []
+
     def save_raw_image(
         self,
         png_bytes: bytes,
