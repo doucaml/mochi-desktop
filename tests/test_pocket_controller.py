@@ -66,6 +66,9 @@ class _Interaction:
     def mark_interaction(self) -> None:
         self.events.append("mark-interaction")
 
+    def resume_ambient(self) -> None:
+        self.events.append("resume-ambient")
+
     def show_feedback(self, message: str) -> None:
         self.feedback.append(message)
 
@@ -79,6 +82,7 @@ def _controller(store: _Store, interaction: _Interaction) -> PocketController:
         transition=interaction.transition,
         play_animation=interaction.play,
         mark_interaction=interaction.mark_interaction,
+        resume_ambient=interaction.resume_ambient,
         show_feedback=interaction.show_feedback,
     )
 
@@ -104,6 +108,122 @@ def test_receive_persists_before_one_reaction_for_the_whole_batch() -> None:
     ]
     assert controller.items == (first, second)
     assert controller.count == 2
+
+
+def test_hover_claims_presentation_once_and_loops_open_mouth_animation() -> None:
+    store = _Store()
+    interaction = _Interaction(MochiState.WATCHING)
+    controller = _controller(store, interaction)
+
+    assert controller.begin_hover() is True
+    assert controller.begin_hover() is True
+
+    assert interaction.events == [
+        "cancel-ambient",
+        "transition:EXCITED",
+        "play:pocket_hover:None",
+    ]
+    assert controller.hover_active is True
+    assert store.events == []
+
+
+def test_hover_leave_restores_idle_and_resumes_ambient_once() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+    assert controller.begin_hover()
+    interaction.events.clear()
+
+    controller.end_hover()
+    controller.end_hover()
+
+    assert interaction.events == [
+        "transition:IDLE",
+        "play:idle:None",
+        "resume-ambient",
+    ]
+    assert controller.hover_active is False
+
+
+def test_hover_leave_does_not_overwrite_a_new_protected_owner() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+    assert controller.begin_hover()
+    interaction.events.clear()
+    interaction.state = MochiState.SLEEPING
+
+    controller.end_hover()
+
+    assert interaction.events == []
+    assert interaction.state is MochiState.SLEEPING
+    assert controller.hover_active is False
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        MochiState.SLEEPING,
+        MochiState.WAKING,
+        MochiState.PICKUP,
+        MochiState.DRAGGED,
+        MochiState.DROPPING,
+        MochiState.FEDORA,
+        MochiState.EXCITED,
+        MochiState.EATING,
+        MochiState.HEART,
+        MochiState.BOUNCING,
+        MochiState.SQUISHING,
+    ],
+)
+def test_hover_rejects_protected_or_direct_owned_states(state: MochiState) -> None:
+    store = _Store()
+    interaction = _Interaction(state)
+    controller = _controller(store, interaction)
+
+    assert controller.begin_hover() is False
+
+    assert interaction.events == []
+    assert controller.hover_active is False
+    assert store.events == []
+
+
+def test_hovered_drop_persists_before_short_closing_tail() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    events: list[str] = []
+    store.events = events
+    interaction.events = events
+    controller = _controller(store, interaction)
+    assert controller.begin_hover()
+    events.clear()
+
+    assert controller.receive([make_text_item("note")]) is True
+
+    assert events == [
+        "persist",
+        "mark-interaction",
+        "play:pocket_finish:idle",
+    ]
+    assert controller.hover_active is False
+
+
+def test_hovered_persistence_failure_restores_normal_presentation() -> None:
+    store = _Store(fail_add=True)
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+    assert controller.begin_hover()
+    interaction.events.clear()
+
+    assert controller.receive([make_text_item("note")]) is False
+
+    assert interaction.events == [
+        "transition:IDLE",
+        "play:idle:None",
+        "resume-ambient",
+    ]
+    assert interaction.feedback == ["I couldn't hold that"]
+    assert controller.hover_active is False
 
 
 @pytest.mark.parametrize(
@@ -237,6 +357,7 @@ def test_remove_persists_then_publishes_count_change() -> None:
         transition=interaction.transition,
         play_animation=interaction.play,
         mark_interaction=interaction.mark_interaction,
+        resume_ambient=interaction.resume_ambient,
         show_feedback=interaction.show_feedback,
         on_changed=lambda items: changed.append(len(items)),
     )

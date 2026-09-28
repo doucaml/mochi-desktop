@@ -118,6 +118,21 @@ ANIMATIONS["table_flip"] = replace(
     ),
 )
 ANIMATIONS["excited"] = replace(ANIMATIONS["bounce"], name="excited")
+pocket_grab_frames = ANIMATIONS["pocket_grab"].frames
+ANIMATIONS["pocket_hover"] = replace(
+    ANIMATIONS["pocket_grab"],
+    name="pocket_hover",
+    frames=tuple(pocket_grab_frames[index - 1] for index in (4, 5, 6, 7, 6, 5)),
+    looping=True,
+    next_state=None,
+)
+ANIMATIONS["pocket_finish"] = replace(
+    ANIMATIONS["pocket_grab"],
+    name="pocket_finish",
+    frames=(pocket_grab_frames[6], pocket_grab_frames[7]),
+    looping=False,
+    next_state="idle",
+)
 
 
 class SpriteAtlas:

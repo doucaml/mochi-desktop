@@ -75,6 +75,34 @@ class SpriteDefinitionsTests(unittest.TestCase):
             },
         )
 
+    def test_pocket_hover_loops_the_open_mouth_middle_frames(self) -> None:
+        hover = ANIMATIONS["pocket_hover"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in hover.frames),
+            tuple(
+                f"pocket_grab/mochi_pocket_grab_{index:04}.png"
+                for index in (4, 5, 6, 7, 6, 5)
+            ),
+        )
+        self.assertEqual(hover.frame_duration_ms, 120)
+        self.assertTrue(hover.looping)
+        self.assertIsNone(hover.next_state)
+
+    def test_pocket_finish_closes_without_restarting_the_full_animation(self) -> None:
+        finish = ANIMATIONS["pocket_finish"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in finish.frames),
+            (
+                "pocket_grab/mochi_pocket_grab_0007.png",
+                "pocket_grab/mochi_pocket_grab_0008.png",
+            ),
+        )
+        self.assertEqual(finish.frame_duration_ms, 120)
+        self.assertFalse(finish.looping)
+        self.assertEqual(finish.next_state, "idle")
+
     def test_drop_is_a_quick_six_frame_one_shot(self) -> None:
         drop = ANIMATIONS["drop"]
         self.assertEqual(len(drop.frames), 6)

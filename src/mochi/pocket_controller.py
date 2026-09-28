@@ -24,6 +24,7 @@ class PocketController:
         transition: Callable[[MochiState], bool],
         play_animation: Callable[[str, str | None], None],
         mark_interaction: Callable[[], None],
+        resume_ambient: Callable[[], object],
         show_feedback: Callable[[str], None],
         on_changed: Callable[[tuple[PocketItem, ...]], None] | None = None,
         logger: logging.Logger | None = None,
@@ -35,11 +36,13 @@ class PocketController:
         self._transition = transition
         self._play_animation = play_animation
         self._mark_interaction = mark_interaction
+        self._resume_ambient = resume_ambient
         self._show_feedback = show_feedback
         self._on_changed = on_changed or (lambda _items: None)
         self._logger = logger or logging.getLogger(__name__)
         self._items = tuple(store.load())
         self._busy = False
+        self._hover_active = False
 
     @property
     def items(self) -> tuple[PocketItem, ...]:
@@ -53,13 +56,53 @@ class PocketController:
     def busy(self) -> bool:
         return self._busy
 
+    @property
+    def hover_active(self) -> bool:
+        return self._hover_active
+
     def can_receive(self) -> bool:
-        return not self._busy and can_start_pocket_receive(self._current_state())
+        if self._busy:
+            return False
+        if self._hover_active:
+            return self._current_state() is MochiState.EXCITED
+        return can_start_pocket_receive(self._current_state())
+
+    def begin_hover(self) -> bool:
+        """Claim presentation for one supported drag without restarting it."""
+        if self._hover_active:
+            return True
+        if not self.can_receive():
+            return False
+
+        state = self._current_state()
+        if state is MochiState.WALKING:
+            self._cancel_walk()
+        else:
+            self._cancel_ambient()
+        if not self._transition(MochiState.EXCITED):
+            self._logger.warning(
+                "Pocket hover presentation was rejected from %s",
+                self._current_state().name,
+            )
+            self._resume_normal_presentation()
+            return False
+
+        self._hover_active = True
+        self._play_animation("pocket_hover", None)
+        return True
+
+    def end_hover(self) -> None:
+        """Release hover presentation after leave, cancellation, or failure."""
+        if not self._hover_active:
+            return
+        self._hover_active = False
+        self._resume_normal_presentation()
 
     def receive(self, incoming: Iterable[PocketItem]) -> bool:
         candidates = tuple(incoming)
         if not candidates:
             self.reject_unsupported()
+            self.end_hover()
             return False
         if not self.can_receive():
             self._show_feedback("My paws are full")
@@ -83,6 +126,7 @@ class PocketController:
             except (OSError, ValueError) as error:
                 self._logger.warning("Could not save Pocket image: %s", error)
                 self._show_feedback("I couldn't hold that")
+                self.end_hover()
                 return False
             return self._persist_and_react((item,))
         finally:
@@ -113,10 +157,20 @@ class PocketController:
         except OSError as error:
             self._logger.warning("Could not persist Pocket drop: %s", error)
             self._show_feedback("I couldn't hold that")
+            self.end_hover()
             return False
 
         self._items = mutation.items
         self._on_changed(self._items)
+
+        if self._hover_active:
+            self._hover_active = False
+            self._mark_interaction()
+            self._play_animation("pocket_finish", "idle")
+            self._show_feedback(
+                self._held_message(len(candidates), len(mutation.evicted))
+            )
+            return True
 
         state = self._current_state()
         if state is MochiState.WALKING:
@@ -143,6 +197,14 @@ class PocketController:
             self._held_message(len(candidates), len(mutation.evicted))
         )
         return True
+
+    def _resume_normal_presentation(self) -> None:
+        if self._current_state() is not MochiState.EXCITED:
+            return
+        if not self._transition(MochiState.IDLE):
+            return
+        self._play_animation("idle", None)
+        self._resume_ambient()
 
     @staticmethod
     def _held_message(received: int, evicted: int) -> str:

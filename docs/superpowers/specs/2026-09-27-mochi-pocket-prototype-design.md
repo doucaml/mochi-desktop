@@ -171,8 +171,8 @@ Responsibilities:
 - register supported drop targets on Mochi;
 - recognize file lists, strings, URLs, and textures;
 - classify GTK payloads into normalized domain candidates;
-- update acceptance highlight while a supported drag is over Mochi;
-- clear highlight on leave, cancel, or completed drop;
+- start one looping open-mouth preview while a supported drag is over Mochi;
+- end the preview on leave, cancel, rejection, or completed drop;
 - reject unsupported formats safely;
 - reject while Pocket cannot claim interaction ownership;
 - hand accepted batches to the Pocket service;
@@ -295,18 +295,21 @@ Managed images selected for eviction are deleted only after the new Pocket metad
 
 ### Drag-over feedback
 
-Supported content over Mochi produces a green acceptance highlight.
+Supported content over Mochi claims the existing guarded direct-interaction
+presentation path and loops the open-mouth middle frames of the supplied Pocket
+animation in this order: `4 → 5 → 6 → 7 → 6 → 5`, at 120 ms per frame.
 
 Unsupported content uses the system no-drop cursor where available.
 
-Repeated drag-motion events may update the highlight but must not:
+Repeated drag-motion events keep the existing preview running and must not:
 
 - write Pocket data;
 - create items;
-- restart an animation;
-- mutate the behavior state.
+- restart the preview;
+- request another behavior transition.
 
-Leaving or cancelling the drag clears the highlight immediately.
+Leaving or cancelling the drag immediately stops the preview, returns through
+the normal idle/ambient-resume path, and writes nothing.
 
 ### Accepted drop
 
@@ -321,7 +324,8 @@ For a supported drop:
 7. publish the live in-memory Pocket only after persistence succeeds;
 8. clean up successfully evicted managed images;
 9. record direct user interaction;
-10. play the dedicated Pocket receive animation;
+10. if the open-mouth hover preview is active, play only closing frames `7 → 8`;
+    otherwise play the complete dedicated Pocket receive animation;
 11. recover through Mochi’s normal reaction/ambient-resume path.
 
 The drop is reported successful only after persistence succeeds.
@@ -338,7 +342,7 @@ When presentation is available, Mochi gives brief feedback such as:
 I can’t hold that yet
 ```
 
-Persistence failure keeps the previous Pocket active, cleans temporary managed-image files, and gives failure feedback.
+Persistence failure keeps the previous Pocket active, cleans temporary managed-image files, ends any hover preview through the normal resume path, and gives failure feedback.
 
 ## Behavior-state ownership
 
@@ -378,7 +382,13 @@ My paws are full
 
 Do not create a parallel Pocket behavior state machine.
 
-Pocket will use a dedicated receive animation asset supplied separately for this feature. The animation is presentation only; it does not introduce a new behavior-state machine or independent lifecycle. The implementation should map the Pocket receive interaction onto one narrow direct-interaction transition path, then play the dedicated Pocket animation through Mochi’s existing animation system.
+Pocket uses one dedicated receive animation asset supplied for this feature. Its
+middle frames are exposed as the looping `pocket_hover` presentation and its
+last two frames as the one-shot `pocket_finish` presentation; a drop received
+without an active hover may still play the complete `pocket_grab` animation.
+These animations are presentation only and do not introduce another behavior
+state machine. Pocket maps hover and receive onto one narrow direct-interaction
+transition path through Mochi’s existing animation system.
 
 Until the final asset is integrated, tests may use a stub/test animation name or fixture, but production completion requires the supplied Pocket receive asset to be present in the animation manifest and packaging.
 
@@ -553,12 +563,13 @@ Cover:
 - strings;
 - URL classification;
 - textures/images;
-- drag-enter/motion feedback;
-- leave/cancel/drop feedback clearing;
+- drag-enter/motion starts one open-mouth preview without restarting it;
+- leave/cancel/failure restores normal presentation;
+- successful hovered drop plays only the closing tail;
 - one batch and one receive reaction for multi-file drops;
 - unsupported format rejection;
 - busy-state rejection;
-- repeated motion events do not write or restart reaction.
+- repeated motion events do not write or restart the preview.
 
 Where GTK objects are difficult to construct headlessly, keep payload normalization behind thin functions so the domain-facing behavior remains independently testable.
 
@@ -641,8 +652,10 @@ Manual verification must cover:
 
 ### Interaction and lifecycle
 
-- green acceptance glow;
-- cancellation/leave clears glow;
+- open-mouth hover loop starts before release;
+- repeated motion does not restart the loop;
+- cancellation/leave restores idle or current ambient presentation;
+- successful release closes the mouth without replaying the full animation;
 - unsupported feedback;
 - busy-state feedback;
 - open with system default app/browser;
@@ -699,7 +712,8 @@ Implemented by adapter validation and feedback without store mutation.
 
 ### A received-item animation/reaction plays without breaking the state machine
 
-Implemented by the dedicated Pocket receive animation through the central transition policy and normal resume path.
+Implemented by the looping Pocket hover preview and short closing tail through
+the central transition policy and normal resume path.
 
 ### Pocket contents can be viewed, opened, and removed
 
@@ -727,6 +741,8 @@ The reviewed design decisions are:
 - multi-file drops are transactional;
 - one external drop triggers one receive reaction;
 - protected direct/lifecycle states reject Pocket receive;
+- supported hover loops frames `4, 5, 6, 7, 6, 5` without restarting;
+- a successful hovered drop closes with frames `7, 8` after persistence;
 - a dedicated Pocket receive animation asset is supplied and integrated through Mochi’s existing sprite/animation pipeline;
 - Pocket persistence is separate from `ConfigStore`;
 - no generic utility framework is introduced in this issue.

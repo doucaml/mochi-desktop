@@ -129,6 +129,7 @@ class PocketWindow(Gtk.Window):
         super().__init__(title="Mochi Pocket")
         self.set_default_size(500, 520)
         self.set_resizable(True)
+        self.set_hide_on_close(True)
         self.add_css_class("mochi-pocket-window")
         self._controller = controller
         self._launcher = launcher

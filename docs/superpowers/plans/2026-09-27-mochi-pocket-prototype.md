@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a local-first Mochi Pocket prototype that accepts dragged files, text, URLs, and images, persists up to ten recent items, exposes them through Mochi's context menu, and plays the dedicated Pocket receive animation only after a successful save.
+**Goal:** Add a local-first Mochi Pocket prototype that accepts dragged files, text, URLs, and images, persists up to ten recent items, exposes them through Mochi's context menu, previews acceptance with a looping open-mouth animation, and plays the closing receive tail only after a successful save.
 
 **Architecture:** Keep Pocket domain rules and persistence GTK-independent, put drag-and-drop and windows behind thin GTK adapters, and use a small controller to connect those pieces to Mochi's existing behavior/state path. Ordinary local files remain referenced in place; only raw image drops create Pocket-managed files.
 
@@ -21,7 +21,7 @@
 - Duplicate normalized file paths and URLs refresh to newest; duplicate text remains separate.
 - Pocket metadata is stored outside `ConfigStore`.
 - No shell command construction is permitted for opening Pocket items.
-- The dedicated Pocket receive animation plays exactly once per successfully persisted external drop.
+- Supported hover starts one non-restarting open-mouth loop; a successfully persisted hovered drop plays one closing tail.
 - Pocket does not introduce a second behavior-state machine or generic plugin framework.
 
 ## Review Focus
@@ -74,7 +74,7 @@
 - Test: existing sprite/manifest tests plus a focused Pocket animation assertion.
 
 **Interfaces:**
-- Produces: runtime animation name `pocket_grab`, 8 frames, one-shot playback.
+- Produces: runtime animation name `pocket_grab`, 8 frames, one-shot playback, plus derived `pocket_hover` and `pocket_finish` presentations.
 - Consumes: uploaded `mochi_pocket_grab` asset bundle.
 
 - [ ] **Step 1: Write a failing test asserting `pocket_grab` is loadable with 8 frames and is non-looping.**
@@ -92,7 +92,7 @@
 
 **Interfaces:**
 - Consumes: `PocketStore`, `pocket_grab`, buddy callbacks for transition/cancel/reaction/feedback.
-- Produces: `PocketController.receive(items) -> bool`, `remove(item_id)`, `items`, `count`, protected-state gating and exactly-one receive reaction.
+- Produces: `PocketController.begin_hover()`, `end_hover()`, `receive(items) -> bool`, `remove(item_id)`, `items`, `count`, protected-state gating and exactly-one receive reaction.
 
 - [ ] **Step 1: Write failing tests** for persistence-before-reaction, one reaction per batch, busy guard, allowed ambient interruption, protected-state rejection, failure feedback, and normal completion/resume.
 - [ ] **Step 2: Run focused tests and verify RED.**
@@ -110,7 +110,7 @@
 - Consumes: `PocketController.receive` and Task 1 factories.
 - Produces: GTK drop-target installation plus pure payload-normalization helpers.
 
-- [ ] **Step 1: Write failing tests** for file lists, URL/text strings, texture-to-PNG handoff, unsupported payloads, drag highlight lifecycle, busy rejection, and no writes/reactions during motion.
+- [ ] **Step 1: Write failing tests** for file lists, URL/text strings, texture-to-PNG handoff, unsupported payloads, hover-preview lifecycle, busy rejection, and no writes/restarts during repeated motion.
 - [ ] **Step 2: Run focused tests and verify RED.**
 - [ ] **Step 3: Implement thin GTK adapter and pure normalization helpers.**
 - [ ] **Step 4: Run focused tests and verify GREEN.**

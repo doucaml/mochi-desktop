@@ -56,16 +56,34 @@ class _Controller:
         self.images = []
         self.rejections = 0
         self.busy_rejections = 0
+        self.hover_starts = 0
+        self.hover_ends = 0
+        self.hover_active = False
 
     def can_receive(self) -> bool:
         return self.accepting
 
+    def begin_hover(self) -> bool:
+        if not self.accepting:
+            return False
+        if not self.hover_active:
+            self.hover_starts += 1
+            self.hover_active = True
+        return True
+
+    def end_hover(self) -> None:
+        if self.hover_active:
+            self.hover_ends += 1
+            self.hover_active = False
+
     def receive(self, items) -> bool:
         self.received.append(tuple(items))
+        self.hover_active = False
         return True
 
     def receive_image(self, png_bytes: bytes) -> bool:
         self.images.append(png_bytes)
+        self.hover_active = False
         return True
 
     def reject_unsupported(self) -> None:
@@ -78,7 +96,6 @@ class _Controller:
 def _adapter():
     widget = _Widget()
     controller = _Controller()
-    highlights = []
     targets = []
 
     def target_factory(value_type, action):
@@ -89,10 +106,9 @@ def _adapter():
     adapter = PocketDropAdapter(
         widget,
         controller,
-        set_highlight=highlights.append,
         target_factory=target_factory,
     )
-    return adapter, widget, controller, highlights, targets
+    return adapter, widget, controller, targets
 
 
 def test_file_payload_becomes_one_normalized_item_per_local_path(
@@ -138,8 +154,8 @@ def test_texture_is_encoded_to_png_bytes() -> None:
     assert texture_to_png_bytes(_Texture(b"png-data")) == b"png-data"
 
 
-def test_motion_only_updates_highlight_and_never_receives() -> None:
-    _adapter_instance, _widget, controller, highlights, targets = _adapter()
+def test_motion_starts_hover_preview_without_receiving_or_restarting() -> None:
+    _adapter_instance, _widget, controller, targets = _adapter()
     file_target = targets[0]
 
     action = file_target.callbacks["enter"](file_target, 1.0, 2.0)
@@ -148,13 +164,14 @@ def test_motion_only_updates_highlight_and_never_receives() -> None:
 
     assert int(action) != 0
     assert int(motion_action) != 0
-    assert highlights == [True, True, False]
+    assert controller.hover_starts == 1
+    assert controller.hover_ends == 1
     assert controller.received == []
     assert controller.images == []
 
 
 def test_file_drop_forwards_one_batch_and_clears_highlight(tmp_path: Path) -> None:
-    _adapter_instance, _widget, controller, highlights, targets = _adapter()
+    _adapter_instance, _widget, controller, targets = _adapter()
     file_target = targets[0]
     payload = [_File(str(tmp_path / "a")), _File(str(tmp_path / "b"))]
 
@@ -162,11 +179,12 @@ def test_file_drop_forwards_one_batch_and_clears_highlight(tmp_path: Path) -> No
 
     assert len(controller.received) == 1
     assert len(controller.received[0]) == 2
-    assert highlights == [False]
+    assert controller.hover_starts == 1
+    assert controller.hover_active is False
 
 
 def test_texture_drop_hands_png_bytes_to_controller() -> None:
-    _adapter_instance, _widget, controller, highlights, targets = _adapter()
+    _adapter_instance, _widget, controller, targets = _adapter()
     texture_target = targets[2]
 
     assert texture_target.callbacks["drop"](
@@ -174,13 +192,14 @@ def test_texture_drop_hands_png_bytes_to_controller() -> None:
     )
 
     assert controller.images == [b"png-data"]
-    assert highlights == [False]
+    assert controller.hover_starts == 1
+    assert controller.hover_active is False
 
 
 def test_busy_controller_rejects_motion_and_drop_without_mutation(
     tmp_path: Path,
 ) -> None:
-    _adapter_instance, _widget, controller, highlights, targets = _adapter()
+    _adapter_instance, _widget, controller, targets = _adapter()
     controller.accepting = False
     file_target = targets[0]
 
@@ -191,13 +210,14 @@ def test_busy_controller_rejects_motion_and_drop_without_mutation(
 
     assert int(action) == 0
     assert accepted is False
-    assert highlights == [False, False]
+    assert controller.hover_starts == 0
+    assert controller.hover_ends == 0
     assert controller.received == []
     assert controller.busy_rejections == 1
 
 
 def test_unsupported_string_drop_reports_rejection_without_receiving() -> None:
-    _adapter_instance, _widget, controller, highlights, targets = _adapter()
+    _adapter_instance, _widget, controller, targets = _adapter()
     string_target = targets[1]
 
     accepted = string_target.callbacks["drop"](
@@ -207,4 +227,5 @@ def test_unsupported_string_drop_reports_rejection_without_receiving() -> None:
     assert accepted is False
     assert controller.rejections == 1
     assert controller.received == []
-    assert highlights == [False]
+    assert controller.hover_starts == 1
+    assert controller.hover_ends == 1

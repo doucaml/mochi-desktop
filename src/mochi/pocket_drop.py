@@ -75,12 +75,10 @@ class PocketDropAdapter:
         widget: Gtk.Widget,
         controller: PocketController,
         *,
-        set_highlight: Callable[[bool], None] | None = None,
         target_factory: Callable[[object, Gdk.DragAction], object] | None = None,
     ) -> None:
         self._widget = widget
         self._controller = controller
-        self._set_highlight = set_highlight or self._set_widget_highlight
         self._target_factory = target_factory or Gtk.DropTarget.new
         self._targets: list[object] = []
         self._install_target(Gdk.FileList, self._receive_files)
@@ -92,7 +90,7 @@ class PocketDropAdapter:
         return tuple(self._targets)
 
     def detach(self) -> None:
-        self._set_highlight(False)
+        self._controller.end_hover()
         remover = getattr(self._widget, "remove_controller", None)
         if callable(remover):
             for target in self._targets:
@@ -115,22 +113,21 @@ class PocketDropAdapter:
         return self._drag_action()
 
     def _on_leave(self, _target) -> None:
-        self._set_highlight(False)
+        self._controller.end_hover()
 
     def _drag_action(self) -> Gdk.DragAction:
-        accepted = self._controller.can_receive()
-        self._set_highlight(accepted)
+        accepted = self._controller.begin_hover()
         return Gdk.DragAction.COPY if accepted else Gdk.DragAction.NONE
 
     def _on_drop(self, value: object, receive: Callable[[Any], bool]) -> bool:
-        self._set_highlight(False)
-        if not self._controller.can_receive():
+        if not self._controller.begin_hover():
             self._controller.reject_busy()
             return False
         try:
             return bool(receive(value))
         except (AttributeError, GLib.Error, OSError, TypeError, ValueError):
             self._controller.reject_unsupported()
+            self._controller.end_hover()
             return False
 
     def _receive_files(self, value: object) -> bool:
@@ -143,9 +140,3 @@ class PocketDropAdapter:
 
     def _receive_texture(self, value: object) -> bool:
         return self._controller.receive_image(texture_to_png_bytes(value))
-
-    def _set_widget_highlight(self, active: bool) -> None:
-        if active:
-            self._widget.add_css_class("pocket-drop-active")
-        else:
-            self._widget.remove_css_class("pocket-drop-active")

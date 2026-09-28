@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from mochi.care import BondPhase, bond_phase_for_level
+from mochi.pocket_integration import PocketBuddyMixin
 from mochi.quick_start import QuickStartMixin
 from mochi.sound import SoundEvent
 
@@ -190,6 +191,7 @@ class PresenceBuddy(
     EmoteCatalogueMixin,
     BondMeterMixin,
     FeedMochiMixin,
+    PocketBuddyMixin,
     NameplateMixin,
     BasePresenceBuddy,
 ):
@@ -209,6 +211,7 @@ class PresenceX11Buddy(
     EmoteCatalogueMixin,
     BondMeterMixin,
     FeedMochiMixin,
+    PocketBuddyMixin,
     NameplateMixin,
     BasePresenceX11Buddy,
 ):

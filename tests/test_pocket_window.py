@@ -31,6 +31,7 @@ def test_empty_pocket_shows_drag_explanation() -> None:
     window = PocketWindow(_Controller())
 
     assert window.empty_visible is True
+    assert window.get_hide_on_close() is True
     assert window.rows == {}
     assert "drag" in window.empty_text.lower()
 
