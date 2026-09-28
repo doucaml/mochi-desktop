@@ -103,6 +103,17 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertFalse(finish.looping)
         self.assertEqual(finish.next_state, "idle")
 
+    def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        with (project_root / "pyproject.toml").open("rb") as stream:
+            pyproject = tomllib.load(stream)
+
+        data_files = pyproject["tool"]["setuptools"]["data-files"]
+        self.assertEqual(
+            data_files["share/mochi/pocket_grab"],
+            ["assets/mochi/pocket_grab/*.png"],
+        )
+
     def test_drop_is_a_quick_six_frame_one_shot(self) -> None:
         drop = ANIMATIONS["drop"]
         self.assertEqual(len(drop.frames), 6)
