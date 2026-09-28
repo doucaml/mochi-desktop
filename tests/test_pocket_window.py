@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock
 
-from gi.repository import Gtk
 
 from mochi.pocket import (
     make_local_file_item,
@@ -21,6 +20,7 @@ class _Controller:
         self.removed = []
         self.clear_calls = 0
         self.clear_succeeds = True
+        self.on_changed = None
 
     @property
     def items(self):
@@ -29,6 +29,8 @@ class _Controller:
     def remove(self, item_id: str) -> bool:
         self.removed.append(item_id)
         self._items = tuple(item for item in self._items if item.id != item_id)
+        if self.on_changed is not None:
+            self.on_changed()
         return True
 
     def clear_all(self) -> bool:
@@ -36,6 +38,8 @@ class _Controller:
         if not self.clear_succeeds:
             return False
         self._items = ()
+        if self.on_changed is not None:
+            self.on_changed()
         return True
 
 
@@ -184,7 +188,7 @@ def test_clear_all_requires_confirmation_then_refreshes_to_empty() -> None:
     assert dialog is not None
     assert controller.clear_calls == 0
 
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    dialog.respond(True)
 
     assert controller.clear_calls == 1
     assert window.clear_dialog is None
@@ -202,7 +206,7 @@ def test_clear_all_cancel_preserves_items() -> None:
     dialog = window.clear_dialog
     assert dialog is not None
 
-    dialog.response(Gtk.ResponseType.CANCEL)
+    dialog.respond(False)
 
     assert controller.clear_calls == 0
     assert tuple(window.rows) == (item.id,)
@@ -218,7 +222,7 @@ def test_clear_all_failure_preserves_rows_and_shows_error() -> None:
     window.clear_button.emit("clicked")
     dialog = window.clear_dialog
     assert dialog is not None
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    dialog.respond(True)
 
     assert controller.clear_calls == 1
     assert tuple(window.rows) == (item.id,)
@@ -235,7 +239,39 @@ def test_clear_all_closes_owned_text_detail_windows() -> None:
     window.clear_button.emit("clicked")
     dialog = window.clear_dialog
     assert dialog is not None
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    dialog.respond(True)
 
     detail.destroy.assert_called_once_with()
     assert window.detail_windows == []
+
+
+
+def test_remove_avoids_duplicate_refresh_when_change_callback_already_synced() -> None:
+    item = make_text_item("remove once")
+    controller = _Controller((item,))
+    window = PocketWindow(controller)
+    controller.on_changed = lambda: window.refresh()
+    original_refresh = window.refresh
+    window.refresh = Mock(wraps=original_refresh)
+
+    window.rows[item.id].remove_button.emit("clicked")
+
+    assert window.refresh.call_count == 1
+    assert window.rows == {}
+
+
+def test_clear_all_avoids_duplicate_refresh_when_change_callback_already_synced() -> None:
+    item = make_text_item("clear once")
+    controller = _Controller((item,))
+    window = PocketWindow(controller)
+    controller.on_changed = lambda: window.refresh()
+    original_refresh = window.refresh
+    window.refresh = Mock(wraps=original_refresh)
+
+    window.clear_button.emit("clicked")
+    dialog = window.clear_dialog
+    assert dialog is not None
+    dialog.respond(True)
+
+    assert window.refresh.call_count == 1
+    assert window.rows == {}
