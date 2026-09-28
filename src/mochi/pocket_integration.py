@@ -14,6 +14,7 @@ from mochi.pocket_controller import PocketController
 from mochi.pocket_drop import PocketDropAdapter
 from mochi.pocket_store import PocketStore
 from mochi.pocket_window import PocketWindow
+from mochi.sprites import ANIMATIONS
 
 
 class PocketBuddyMixin:
@@ -41,6 +42,15 @@ class PocketBuddyMixin:
         super().__init__(*args, **kwargs)
         if not self._preview_mode:
             self._pocket_drop = PocketDropAdapter(self, self._pocket_controller)
+
+    def _draw(self, area, context, width: int, height: int) -> None:
+        """Add Pocket acceptance glow behind the normal Buddy render."""
+        if self._pocket_controller.hover_active:
+            frame = self.player.frame
+            if frame is None:
+                frame = ANIMATIONS["default"].frames[0]
+            self.atlas.draw_glow(context, frame, width, height)
+        super()._draw(area, context, width, height)
 
     def _build_context_menu(self):
         menu = super()._build_context_menu()
