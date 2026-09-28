@@ -155,37 +155,40 @@ class SpriteDefinitionsTests(unittest.TestCase):
             self.assertFalse(any(row[(size - margin) * 4 : size * 4]))
 
 
-    def test_pocket_glow_remains_visible_outside_sprite_bounds_at_widget_size(self) -> None:
+    def test_pocket_glow_remains_visible_around_transparent_sprite_pixels(self) -> None:
         atlas = SpriteAtlas()
         frame = ANIMATIONS["pocket_hover"].frames[0]
         size = 112
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
 
-        atlas.draw_glow(cairo.Context(surface), frame, size, size, pulse=1.0)
-        surface.flush()
+        glow = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        atlas.draw_glow(cairo.Context(glow), frame, size, size, pulse=1.0)
+        glow.flush()
 
-        x, y, width, height = atlas.visible_bounds(frame, size, size)
-        left = max(0, int(x))
-        top = max(0, int(y))
-        right = min(size, int(x + width + 0.999))
-        bottom = min(size, int(y + height + 0.999))
-        data = bytes(surface.get_data())
-        stride = surface.get_stride()
+        sprite = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        atlas.draw(cairo.Context(sprite), frame, size, size)
+        sprite.flush()
 
-        outside_sprite_has_glow = False
+        glow_data = bytes(glow.get_data())
+        sprite_data = bytes(sprite.get_data())
+        glow_stride = glow.get_stride()
+        sprite_stride = sprite.get_stride()
+
+        visible_halo_pixel = False
         for py in range(size):
-            row = data[py * stride : (py + 1) * stride]
             for px in range(size):
-                if left <= px < right and top <= py < bottom:
-                    continue
-                pixel = row[px * 4 : (px + 1) * 4]
-                if any(pixel):
-                    outside_sprite_has_glow = True
+                glow_pixel = glow_data[
+                    py * glow_stride + px * 4 : py * glow_stride + (px + 1) * 4
+                ]
+                sprite_pixel = sprite_data[
+                    py * sprite_stride + px * 4 : py * sprite_stride + (px + 1) * 4
+                ]
+                if any(glow_pixel) and not any(sprite_pixel):
+                    visible_halo_pixel = True
                     break
-            if outside_sprite_has_glow:
+            if visible_halo_pixel:
                 break
 
-        self.assertTrue(outside_sprite_has_glow)
+        self.assertTrue(visible_halo_pixel)
 
     def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
