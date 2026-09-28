@@ -76,6 +76,7 @@ def test_count_change_updates_menu_label_and_open_window() -> None:
     harness = object.__new__(PocketBuddyMixin)
     harness._pocket_label = Mock()
     harness._pocket_window = Mock()
+    harness._pocket_window.get_visible.return_value = True
     items = (object(), object())
 
     harness._on_pocket_changed(items)
@@ -169,3 +170,16 @@ def test_normal_render_skips_pocket_glow_when_not_hovering() -> None:
 
     harness.atlas.draw_glow.assert_not_called()
     assert harness.base_draws == [("area", "context", 112, 112)]
+
+
+
+def test_hidden_pocket_window_skips_row_rebuild_until_next_open() -> None:
+    harness = object.__new__(PocketBuddyMixin)
+    harness._pocket_label = Mock()
+    harness._pocket_window = Mock()
+    harness._pocket_window.get_visible.return_value = False
+
+    harness._on_pocket_changed((object(),))
+
+    harness._pocket_label.set_text.assert_called_once_with("Pocket · 1")
+    harness._pocket_window.refresh.assert_not_called()
