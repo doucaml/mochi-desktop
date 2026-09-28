@@ -190,40 +190,59 @@ class SpriteAtlas:
         center_x = x + visible_width / 2
         center_y = y + visible_height / 2
 
-        breath_scale = 0.92 + 0.12 * pulse
-        radius_x = max(1.0, visible_width * 0.78 * breath_scale)
-        radius_y = max(1.0, visible_height * 0.78 * breath_scale)
-        outer_alpha = 0.18 + 0.10 * pulse
-        inner_alpha = 0.24 + 0.10 * pulse
+        # Keep the aura comfortably inside the transparent Buddy canvas.
+        # The previous pulse could reach the DrawingArea boundary, where GTK
+        # clipped it into a visible square. Leave real transparent padding and
+        # make the gradient itself reach zero opacity before its geometric edge.
+        edge_margin = 10.0
+        max_radius_x = max(
+            1.0,
+            min(center_x, width - center_x) - edge_margin,
+        )
+        max_radius_y = max(
+            1.0,
+            min(center_y, height - center_y) - edge_margin,
+        )
+
+        # Animate mostly through luminance. Radius only grows by about six
+        # percent across the pulse so the effect breathes instead of balloons.
+        desired_radius_x = visible_width * (0.60 + 0.04 * pulse)
+        desired_radius_y = visible_height * (0.60 + 0.04 * pulse)
+        radius_x = min(max_radius_x, max(1.0, desired_radius_x))
+        radius_y = min(max_radius_y, max(1.0, desired_radius_y))
+        outer_alpha = 0.18 + 0.08 * pulse
+        inner_alpha = 0.23 + 0.10 * pulse
 
         context.save()
         context.translate(center_x, center_y)
         context.scale(radius_x, radius_y)
 
-        outer = cairo.RadialGradient(0.0, 0.0, 0.08, 0.0, 0.0, 1.0)
+        outer = cairo.RadialGradient(0.0, 0.0, 0.06, 0.0, 0.0, 1.0)
         outer.add_color_stop_rgba(0.0, 0.475, 0.788, 0.545, outer_alpha)
         outer.add_color_stop_rgba(
-            0.58,
+            0.50,
             0.475,
             0.788,
             0.545,
-            outer_alpha * 0.58,
+            outer_alpha * 0.45,
         )
+        outer.add_color_stop_rgba(0.78, 0.475, 0.788, 0.545, 0.0)
         outer.add_color_stop_rgba(1.0, 0.475, 0.788, 0.545, 0.0)
         context.set_source(outer)
         context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
         context.fill()
 
-        context.scale(0.68, 0.68)
+        context.scale(0.66, 0.66)
         inner = cairo.RadialGradient(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
         inner.add_color_stop_rgba(0.0, 0.56, 0.88, 0.63, inner_alpha)
         inner.add_color_stop_rgba(
-            0.72,
+            0.58,
             0.56,
             0.88,
             0.63,
-            inner_alpha * 0.32,
+            inner_alpha * 0.28,
         )
+        inner.add_color_stop_rgba(0.82, 0.56, 0.88, 0.63, 0.0)
         inner.add_color_stop_rgba(1.0, 0.56, 0.88, 0.63, 0.0)
         context.set_source(inner)
         context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
