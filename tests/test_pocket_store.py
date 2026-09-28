@@ -203,3 +203,38 @@ def test_clear_save_failure_preserves_items_and_managed_images(
 
     assert store.path.read_text(encoding="utf-8") == before
     assert image_path.exists()
+
+
+
+def test_unreadable_metadata_does_not_crash_and_blocks_overwrite(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = PocketStore(path=tmp_path / "pocket.json", images_dir=tmp_path / "images")
+    store.path.write_text('{"version": 1, "items": []}', encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def fail_read(self: Path, *args, **kwargs):
+        if self == store.path:
+            raise PermissionError("permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fail_read)
+
+    assert store.load() == []
+    with pytest.raises(OSError, match="could not be read safely"):
+        store.add_items([], [make_text_item("must not overwrite")])
+
+
+def test_invalid_utf8_metadata_is_treated_as_corrupt_and_preserved(
+    tmp_path: Path,
+) -> None:
+    store = PocketStore(path=tmp_path / "pocket.json", images_dir=tmp_path / "images")
+    store.path.write_bytes(b"\xff\xfe\x00")
+
+    assert store.load() == []
+
+    store.add_items([], [make_text_item("recovered", received_at=1)])
+    backups = list(tmp_path.glob("pocket.corrupt-*.json"))
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == b"\xff\xfe\x00"
