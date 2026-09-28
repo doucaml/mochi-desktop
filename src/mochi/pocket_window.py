@@ -136,6 +136,7 @@ class PocketWindow(Gtk.Window):
         self._launcher = launcher
         self.rows: dict[str, PocketRowWidgets] = {}
         self.detail_windows: list[PocketTextWindow] = []
+        self.clear_dialog: Gtk.Dialog | None = None
         self.empty_visible = False
         self.empty_text = self.EMPTY_TEXT
         self.error_text = ""
@@ -145,10 +146,20 @@ class PocketWindow(Gtk.Window):
         card.add_css_class("mochi-pocket-card")
         self.set_child(card)
 
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        card.append(header)
+
         title = Gtk.Label(label="Pocket")
         title.set_xalign(0)
+        title.set_hexpand(True)
         title.add_css_class("mochi-pocket-title")
-        card.append(title)
+        header.append(title)
+
+        self.clear_button = Gtk.Button(label="Clear All")
+        self.clear_button.add_css_class("destructive-action")
+        self.clear_button.set_tooltip_text("Remove everything from Pocket")
+        self.clear_button.connect("clicked", self._request_clear_all)
+        header.append(self.clear_button)
 
         subtitle = Gtk.Label(label="The latest things Mochi is holding for you.")
         subtitle.set_xalign(0)
@@ -205,12 +216,14 @@ class PocketWindow(Gtk.Window):
         self.empty_visible = not self.rows
         self._empty.set_visible(self.empty_visible)
         self._scroll.set_visible(not self.empty_visible)
+        self.clear_button.set_sensitive(not self.empty_visible)
 
     def destroy(self) -> None:
-        details = tuple(self.detail_windows)
-        self.detail_windows.clear()
-        for detail in details:
-            detail.destroy()
+        if self.clear_dialog is not None:
+            dialog = self.clear_dialog
+            self.clear_dialog = None
+            dialog.destroy()
+        self._close_detail_windows()
         super().destroy()
 
     def open_item(self, item_id: str) -> bool:
@@ -260,6 +273,66 @@ class PocketWindow(Gtk.Window):
         self._clear_error()
         self.refresh()
         return True
+
+    def _request_clear_all(self, _button: Gtk.Button) -> None:
+        if not self._controller.items or self.clear_dialog is not None:
+            return
+
+        dialog = Gtk.Dialog(
+            title="Clear Pocket?",
+            transient_for=self,
+            modal=True,
+        )
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        clear_button = dialog.add_button("Clear All", Gtk.ResponseType.ACCEPT)
+        clear_button.add_css_class("destructive-action")
+
+        content = dialog.get_content_area()
+        content.set_spacing(8)
+        content.set_margin_top(16)
+        content.set_margin_bottom(16)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+
+        message = Gtk.Label(
+            label=(
+                "Remove everything from Pocket? "
+                "Original files on your computer will not be deleted."
+            )
+        )
+        message.set_wrap(True)
+        message.set_xalign(0)
+        content.append(message)
+
+        dialog.connect("response", self._on_clear_response)
+        self.clear_dialog = dialog
+        dialog.present()
+
+    def _on_clear_response(
+        self,
+        dialog: Gtk.Dialog,
+        response_id: int,
+    ) -> None:
+        accepted = response_id == Gtk.ResponseType.ACCEPT
+        if self.clear_dialog is dialog:
+            self.clear_dialog = None
+        dialog.destroy()
+
+        if not accepted:
+            return
+        if not self._controller.clear_all():
+            self._show_error("Mochi couldn't clear Pocket.")
+            return
+
+        self._close_detail_windows()
+        self._clear_error()
+        self.refresh()
+
+    def _close_detail_windows(self) -> None:
+        details = tuple(self.detail_windows)
+        self.detail_windows.clear()
+        for detail in details:
+            detail.destroy()
 
     def _make_row(self, item: PocketItem) -> PocketRowWidgets:
         model = row_model(item)
