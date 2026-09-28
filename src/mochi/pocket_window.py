@@ -94,13 +94,22 @@ def _launch_default(uri: str) -> None:
 class PocketTextWindow(Gtk.Window):
     """Read-only detail view for a Pocket text item."""
 
-    def __init__(self, item: PocketItem, *, parent: Gtk.Window | None = None) -> None:
+    def __init__(
+        self,
+        item: PocketItem,
+        *,
+        parent: Gtk.Window | None = None,
+        on_close: Callable[["PocketTextWindow"], None] | None = None,
+    ) -> None:
         super().__init__(title=item.display_name)
         self.set_default_size(440, 320)
         self.set_resizable(True)
         self.add_css_class("mochi-pocket-window")
+        self._on_close = on_close
         if parent is not None:
             self.set_transient_for(parent)
+        if on_close is not None:
+            self.connect("close-request", self._handle_close_request)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_margin_top(16)
@@ -114,6 +123,13 @@ class PocketTextWindow(Gtk.Window):
         self.text_view.get_buffer().set_text(item.value)
         scroll.set_child(self.text_view)
         self.set_child(scroll)
+
+    def _handle_close_request(self, _window: Gtk.Window) -> bool:
+        callback = self._on_close
+        self._on_close = None
+        if callback is not None:
+            callback(self)
+        return False
 
 
 class PocketClearDialog(Gtk.Window):
@@ -291,7 +307,11 @@ class PocketWindow(Gtk.Window):
         if item is None:
             return False
         if item.kind is PocketItemKind.TEXT:
-            detail = PocketTextWindow(item, parent=self)
+            detail = PocketTextWindow(
+                item,
+                parent=self,
+                on_close=self._on_detail_window_closed,
+            )
             self.detail_windows.append(detail)
             detail.present()
             self._clear_error()
@@ -371,6 +391,10 @@ class PocketWindow(Gtk.Window):
             return
         self.empty_visible = not current_ids
         self.clear_button.set_sensitive(bool(current_ids))
+
+    def _on_detail_window_closed(self, detail: PocketTextWindow) -> None:
+        if detail in self.detail_windows:
+            self.detail_windows.remove(detail)
 
     def _close_detail_windows(self) -> None:
         details = tuple(self.detail_windows)
