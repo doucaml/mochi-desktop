@@ -109,10 +109,27 @@ class SpriteDefinitionsTests(unittest.TestCase):
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
         context = cairo.Context(surface)
 
-        atlas.draw_glow(context, frame, 256, 256)
+        atlas.draw_glow(context, frame, 256, 256, pulse=0.5)
         surface.flush()
 
         self.assertTrue(any(bytes(surface.get_data())))
+
+    def test_pocket_glow_breathes_brighter_and_wider_at_peak_pulse(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+
+        low = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        atlas.draw_glow(cairo.Context(low), frame, 256, 256, pulse=0.0)
+        low.flush()
+
+        high = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        atlas.draw_glow(cairo.Context(high), frame, 256, 256, pulse=1.0)
+        high.flush()
+
+        self.assertGreater(
+            sum(bytes(high.get_data())),
+            sum(bytes(low.get_data())),
+        )
 
     def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
