@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import math
+import time
 
 import gi
 
@@ -15,6 +17,16 @@ from mochi.pocket_drop import PocketDropAdapter
 from mochi.pocket_store import PocketStore
 from mochi.pocket_window import PocketWindow
 from mochi.sprites import ANIMATIONS
+
+
+POCKET_GLOW_PERIOD_SECONDS = 1.15
+
+
+def _pocket_glow_pulse(elapsed_seconds: float) -> float:
+    """Return a smooth 0..1 breathing pulse for Pocket hover feedback."""
+    elapsed = max(0.0, float(elapsed_seconds))
+    phase = (elapsed % POCKET_GLOW_PERIOD_SECONDS) / POCKET_GLOW_PERIOD_SECONDS
+    return 0.5 - 0.5 * math.cos(phase * math.tau)
 
 
 class PocketBuddyMixin:
@@ -44,12 +56,26 @@ class PocketBuddyMixin:
             self._pocket_drop = PocketDropAdapter(self, self._pocket_controller)
 
     def _draw(self, area, context, width: int, height: int) -> None:
-        """Add Pocket acceptance glow behind the normal Buddy render."""
+        """Add a breathing Pocket acceptance glow behind the Buddy render."""
         if self._pocket_controller.hover_active:
+            now = time.monotonic()
+            started_at = getattr(self, "_pocket_glow_started_at", None)
+            if started_at is None or now < started_at:
+                started_at = now
+                self._pocket_glow_started_at = now
+
             frame = self.player.frame
             if frame is None:
                 frame = ANIMATIONS["default"].frames[0]
-            self.atlas.draw_glow(context, frame, width, height)
+            self.atlas.draw_glow(
+                context,
+                frame,
+                width,
+                height,
+                pulse=_pocket_glow_pulse(now - started_at),
+            )
+        else:
+            self._pocket_glow_started_at = None
         super()._draw(area, context, width, height)
 
     def _build_context_menu(self):
