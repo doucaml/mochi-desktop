@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from mochi.behavior import can_start_pocket_receive, can_transition
-from mochi.pocket import PocketMutation, make_text_item
+from mochi.pocket import PocketMutation, make_saved_image_item, make_text_item
 from mochi.pocket_controller import PocketController
 from mochi.state import MochiState
 
@@ -30,6 +30,10 @@ class _Store:
         self.events.append("remove")
         self.items = [item for item in current if item.id != item_id]
         return list(self.items)
+
+    def save_raw_image(self, png_bytes):
+        self.events.append("save-image")
+        return make_saved_image_item("/tmp/managed-pocket-image.png")
 
 
 class _Interaction:
@@ -169,6 +173,38 @@ def test_busy_receive_rejects_without_writing_or_reacting() -> None:
 
     assert store.events == []
     assert interaction.events == []
+    assert interaction.feedback == ["My paws are full"]
+
+
+def test_raw_image_is_saved_then_persisted_before_one_reaction() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    events: list[str] = []
+    store.events = events
+    interaction.events = events
+    controller = _controller(store, interaction)
+
+    assert controller.receive_image(b"png-data") is True
+
+    assert events == [
+        "save-image",
+        "persist",
+        "cancel-ambient",
+        "transition:EXCITED",
+        "mark-interaction",
+        "play:pocket_grab:idle",
+    ]
+    assert controller.count == 1
+
+
+def test_busy_raw_image_receive_does_not_create_a_managed_file() -> None:
+    store = _Store()
+    interaction = _Interaction(MochiState.SLEEPING)
+    controller = _controller(store, interaction)
+
+    assert controller.receive_image(b"png-data") is False
+
+    assert store.events == []
     assert interaction.feedback == ["My paws are full"]
 
 

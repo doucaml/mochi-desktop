@@ -59,7 +59,7 @@ class PocketController:
     def receive(self, incoming: Iterable[PocketItem]) -> bool:
         candidates = tuple(incoming)
         if not candidates:
-            self._show_feedback("I can't hold that yet")
+            self.reject_unsupported()
             return False
         if not self.can_receive():
             self._show_feedback("My paws are full")
@@ -67,41 +67,32 @@ class PocketController:
 
         self._busy = True
         try:
-            try:
-                mutation = self._store.add_items(self._items, candidates)
-            except OSError as error:
-                self._logger.warning("Could not persist Pocket drop: %s", error)
-                self._show_feedback("I couldn't hold that")
-                return False
-
-            self._items = mutation.items
-            self._on_changed(self._items)
-
-            state = self._current_state()
-            if state is MochiState.WALKING:
-                self._cancel_walk()
-            else:
-                self._cancel_ambient()
-
-            if not self._transition(MochiState.EXCITED):
-                # Persistence is already authoritative. A transition rejection
-                # cannot safely roll back the accepted content, so retain it and
-                # report the presentation fault without replaying the animation.
-                self._logger.warning(
-                    "Pocket persisted but receive presentation was rejected from %s",
-                    self._current_state().name,
-                )
-                self._show_feedback(self._held_message(len(candidates), len(mutation.evicted)))
-                return True
-
-            self._mark_interaction()
-            self._play_animation("pocket_grab", "idle")
-            self._show_feedback(
-                self._held_message(len(candidates), len(mutation.evicted))
-            )
-            return True
+            return self._persist_and_react(candidates)
         finally:
             self._busy = False
+
+    def receive_image(self, png_bytes: bytes) -> bool:
+        """Save transient texture data and commit it as one Pocket transaction."""
+        if not self.can_receive():
+            self._show_feedback("My paws are full")
+            return False
+        self._busy = True
+        try:
+            try:
+                item = self._store.save_raw_image(png_bytes)
+            except (OSError, ValueError) as error:
+                self._logger.warning("Could not save Pocket image: %s", error)
+                self._show_feedback("I couldn't hold that")
+                return False
+            return self._persist_and_react((item,))
+        finally:
+            self._busy = False
+
+    def reject_unsupported(self) -> None:
+        self._show_feedback("I can't hold that yet")
+
+    def reject_busy(self) -> None:
+        self._show_feedback("My paws are full")
 
     def remove(self, item_id: str) -> bool:
         if not any(item.id == item_id for item in self._items):
@@ -114,6 +105,43 @@ class PocketController:
             return False
         self._items = tuple(remaining)
         self._on_changed(self._items)
+        return True
+
+    def _persist_and_react(self, candidates: tuple[PocketItem, ...]) -> bool:
+        try:
+            mutation = self._store.add_items(self._items, candidates)
+        except OSError as error:
+            self._logger.warning("Could not persist Pocket drop: %s", error)
+            self._show_feedback("I couldn't hold that")
+            return False
+
+        self._items = mutation.items
+        self._on_changed(self._items)
+
+        state = self._current_state()
+        if state is MochiState.WALKING:
+            self._cancel_walk()
+        else:
+            self._cancel_ambient()
+
+        if not self._transition(MochiState.EXCITED):
+            # Persistence is already authoritative. A transition rejection
+            # cannot safely roll back the accepted content, so retain it and
+            # report the presentation fault without replaying the animation.
+            self._logger.warning(
+                "Pocket persisted but receive presentation was rejected from %s",
+                self._current_state().name,
+            )
+            self._show_feedback(
+                self._held_message(len(candidates), len(mutation.evicted))
+            )
+            return True
+
+        self._mark_interaction()
+        self._play_animation("pocket_grab", "idle")
+        self._show_feedback(
+            self._held_message(len(candidates), len(mutation.evicted))
+        )
         return True
 
     @staticmethod
