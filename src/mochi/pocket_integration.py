@@ -99,13 +99,17 @@ class PocketBuddyMixin:
         if self._pocket_window is None:
             self._pocket_window = PocketWindow(self._pocket_controller)
             self._pocket_window.set_transient_for(self._window)
-        self._pocket_window.refresh()
+        else:
+            self._pocket_window.refresh()
         self._pocket_window.present()
 
     def _on_pocket_changed(self, items: Sequence[PocketItem]) -> None:
         if self._pocket_label is not None:
             self._pocket_label.set_text(f"Pocket · {len(items)}")
-        if self._pocket_window is not None:
+        if (
+            self._pocket_window is not None
+            and self._pocket_window.get_visible()
+        ):
             self._pocket_window.refresh()
 
     def _show_pocket_feedback(self, message: str) -> None:
