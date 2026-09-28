@@ -40,6 +40,20 @@ def test_bootstrap_copies_update_package_and_selected_art_before_launch(
         directory = asset_root / name
         directory.mkdir(parents=True)
         (directory / "frame.png").write_bytes(b"png")
+    (asset_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "animations": {
+                    "wave": {
+                        "spritesheet": "wave/wave.png",
+                        "frame_count": 8,
+                        "source_cell_size": [64, 64],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
 
     calls: list[tuple[list[str], dict[str, str]]] = []
 
@@ -66,6 +80,7 @@ def test_bootstrap_copies_update_package_and_selected_art_before_launch(
     assert (workspace / "mochi" / "update" / "worker.py").exists()
     for name in ("idle", "wave", "sad_idle", "focus"):
         assert (workspace / "assets" / "mochi" / name / "frame.png").exists()
+    assert (workspace / "assets" / "mochi" / "manifest.json").exists()
     assert not (workspace / "assets" / "mochi" / "coffee").exists()
 
     request = json.loads((workspace / "request.json").read_text(encoding="utf-8"))
