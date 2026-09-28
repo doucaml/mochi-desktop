@@ -3,227 +3,444 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mochi — Handcrafted Linux Desktop Companion</title>
+  <title>Mochi — A tiny friend for your Linux desktop</title>
   <meta
     name="description"
-    content="Mochi is a handcrafted Linux desktop companion for Fedora, GNOME, and Wayland—a privacy-first pixel-art pet that reacts locally to your activity."
+    content="Meet Mochi: a handcrafted, privacy-first pixel companion for Linux. Drag him around, try Pocket, preview emotes, and install the open-source desktop buddy."
   />
   <meta
     name="robots"
     content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
   />
-  <meta name="author" content="Mika Flowers" />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="author" content="Mochi contributors" />
+  <meta name="theme-color" content="#101913" />
 
   <link rel="canonical" href="https://miflow13.github.io/mochi-desktop/" />
   <link rel="icon" type="image/png" sizes="256x256" href="assets/mochi/idle/idle_01.png" />
-  <link rel="apple-touch-icon" href="assets/mochi_original_set/mochi_default.png" />
+  <link rel="apple-touch-icon" href="assets/mochi/idle/idle_01.png" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Mochi" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://miflow13.github.io/mochi-desktop/" />
-  <meta property="og:title" content="Mochi — Handcrafted Linux Desktop Companion" />
+  <meta property="og:title" content="Mochi — A tiny friend for your Linux desktop" />
   <meta
     property="og:description"
-    content="A privacy-first pixel-art companion for Fedora, GNOME, and Wayland that reacts locally to your desktop activity."
+    content="A handcrafted, privacy-first pixel companion for Linux. Local-first, open source, and a little weird."
   />
   <meta
     property="og:image"
-    content="https://miflow13.github.io/mochi-desktop/assets/mochi_original_set/mochi_default.png"
+    content="https://miflow13.github.io/mochi-desktop/assets/mochi/idle/idle_01.png"
   />
-  <meta property="og:image:type" content="image/png" />
-  <meta property="og:image:width" content="1254" />
-  <meta property="og:image:height" content="1254" />
-  <meta property="og:image:alt" content="Mochi, a handcrafted green pixel-art Linux desktop companion" />
+  <meta property="og:image:alt" content="Mochi, a green pixel-art Linux desktop companion" />
 
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Mochi — Handcrafted Linux Desktop Companion" />
+  <meta name="twitter:title" content="Mochi — A tiny friend for your Linux desktop" />
   <meta
     name="twitter:description"
-    content="A privacy-first pixel-art companion for Fedora, GNOME, and Wayland."
+    content="A handcrafted, privacy-first pixel companion for Linux."
   />
   <meta
     name="twitter:image"
-    content="https://miflow13.github.io/mochi-desktop/assets/mochi_original_set/mochi_default.png"
+    content="https://miflow13.github.io/mochi-desktop/assets/mochi/idle/idle_01.png"
   />
-  <meta name="twitter:image:alt" content="Mochi, a handcrafted green pixel-art Linux desktop companion" />
 
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "WebSite",
-          "@id": "https://miflow13.github.io/mochi-desktop/#website",
-          "url": "https://miflow13.github.io/mochi-desktop/",
-          "name": "Mochi",
-          "alternateName": "Mochi Desktop Companion",
-          "description": "A handcrafted, privacy-first pixel-art companion for the Linux desktop.",
-          "inLanguage": "en-US"
-        },
-        {
-          "@type": "WebPage",
-          "@id": "https://miflow13.github.io/mochi-desktop/#webpage",
-          "url": "https://miflow13.github.io/mochi-desktop/",
-          "name": "Mochi — Handcrafted Linux Desktop Companion",
-          "description": "Mochi is a handcrafted Linux desktop companion for Fedora, GNOME, and Wayland—a privacy-first pixel-art pet that reacts locally to your activity.",
-          "inLanguage": "en-US",
-          "isPartOf": {
-            "@id": "https://miflow13.github.io/mochi-desktop/#website"
-          },
-          "about": {
-            "@id": "https://miflow13.github.io/mochi-desktop/#project"
-          },
-          "author": {
-            "@id": "https://github.com/miflow13#person"
-          },
-          "primaryImageOfPage": {
-            "@id": "https://miflow13.github.io/mochi-desktop/#primaryimage"
-          }
-        },
-        {
-          "@type": "ImageObject",
-          "@id": "https://miflow13.github.io/mochi-desktop/#primaryimage",
-          "url": "https://miflow13.github.io/mochi-desktop/assets/mochi_original_set/mochi_default.png",
-          "contentUrl": "https://miflow13.github.io/mochi-desktop/assets/mochi_original_set/mochi_default.png",
-          "width": 1254,
-          "height": 1254,
-          "caption": "Mochi, a handcrafted green pixel-art Linux desktop companion"
-        },
-        {
-          "@type": "SoftwareSourceCode",
-          "@id": "https://miflow13.github.io/mochi-desktop/#project",
-          "name": "Mochi",
-          "description": "A handcrafted, privacy-first Linux desktop companion built with Python and GTK4.",
-          "codeRepository": "https://github.com/miflow13/mochi-desktop",
-          "license": "https://github.com/miflow13/mochi-desktop/blob/main/LICENSE",
-          "programmingLanguage": "Python",
-          "runtimePlatform": "Fedora Linux, GNOME, Wayland and XWayland",
-          "author": {
-            "@id": "https://github.com/miflow13#person"
-          }
-        },
-        {
-          "@type": "Person",
-          "@id": "https://github.com/miflow13#person",
-          "name": "Mika Flowers",
-          "url": "https://github.com/miflow13"
-        }
-      ]
+      "@type": "SoftwareApplication",
+      "name": "Mochi",
+      "applicationCategory": "DesktopApplication",
+      "operatingSystem": "Linux",
+      "softwareVersion": "0.4.0-alpha.1",
+      "description": "A handcrafted, privacy-first pixel companion for the Linux desktop.",
+      "url": "https://miflow13.github.io/mochi-desktop/",
+      "downloadUrl": "https://github.com/miflow13/mochi-desktop",
+      "codeRepository": "https://github.com/miflow13/mochi-desktop",
+      "license": "https://github.com/miflow13/mochi-desktop/blob/main/LICENSE",
+      "programmingLanguage": "Python"
     }
   </script>
 
   <link rel="stylesheet" href="styles.css" />
+  <script src="site.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>Mochi 🌱</h1>
-    <p class="tagline">a tiny desktop companion for Linux</p>
-    <nav aria-label="Main navigation">
-      <a href="#about">about</a>
-      <span> | </span>
-      <a href="#install">install</a>
-      <span> | </span>
-      <a href="https://github.com/miflow13/mochi-desktop">github</a>
-      <span> | </span>
-      <a href="https://github.com/miflow13/mochi-desktop/issues">issues</a>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Mochi home">
+      <img src="assets/mochi/idle/idle_01.png" alt="" width="36" height="36" />
+      <span>mochi</span>
+      <span class="alpha-pill">v0.4 alpha</span>
+    </a>
+
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#pocket">Pocket</a>
+      <a href="#emotes">Emotes</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#install">Install</a>
+      <a href="#contribute">Contribute</a>
     </nav>
+
+    <a class="github-button" href="https://github.com/miflow13/mochi-desktop">
+      GitHub
+      <span aria-hidden="true">↗</span>
+    </a>
   </header>
 
-  <hr />
+  <main id="main-content">
+    <section class="hero section-shell" id="top" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> handcrafted for Linux</p>
+        <h1 id="hero-title">Your desktop<br />could use a <em>little guy.</em></h1>
+        <p class="hero-lede">
+          Mochi is a tiny pixel companion who wanders, naps, reacts to your desktop,
+          works beside you, and now even holds onto things for you.
+        </p>
 
-  <main>
-    <div class="intro">
-      <p><strong>Early public alpha.</strong> Fedora + GNOME on Wayland is the main tested setup.</p>
-      <p>
-        mochi is a small pixel creature that lives on your desktop. he has personality. he wanders and talks to you as you code.
-      </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">Install Mochi</a>
+          <a class="button button-secondary" href="https://github.com/miflow13/mochi-desktop">View source</a>
+        </div>
 
-      <p class="preview">
-        <img
-          src="https://github.com/user-attachments/assets/d64b6900-3120-4174-9ec6-a40688fe921a"
-          alt="Recorded demo of Mochi beside a terminal window"
-        />
-      </p>
-    </div>
+        <div class="hero-facts" aria-label="Mochi project facts">
+          <span>local-first</span>
+          <span>no cloud AI</span>
+          <span>open source</span>
+          <span>Fedora + GNOME</span>
+        </div>
+      </div>
 
-    <hr />
+      <div class="desktop-demo" id="desktop-demo" aria-label="Interactive Mochi desktop demo">
+        <div class="desktop-topbar">
+          <span class="activities">Activities</span>
+          <span class="desktop-title">Mochi Desktop</span>
+          <span id="desktop-clock" aria-label="Local time">--:--</span>
+        </div>
 
-    <section id="about">
-      <h2>What is mochi?</h2>
-      <p>
-        mochi is a handcrafted Linux desktop companion built with Python, GTK4,
-        Cairo, and a lot of tiny handcrafted PNGs.
-      </p>
-      <ul>
-        <li>Hand-drawn pixel art and animations.</li>
-        <li>Reacts to typing, terminal use, coding, music, video, idle time, and more.</li>
-        <li>state engine that uses broad desktop signals instead of reading what you type.</li>
-        <li>Built primarily for Fedora GNOME with Wayland/XWayland.</li>
-        <li>Still alpha software! Bugs are part of the deal!!!</li>
-      </ul>
+        <div class="desktop-stage" id="desktop-stage">
+          <div class="desktop-orb orb-one" aria-hidden="true"></div>
+          <div class="desktop-orb orb-two" aria-hidden="true"></div>
+
+          <button class="desktop-icon" type="button" data-scroll-target="#pocket">
+            <span class="folder-icon" aria-hidden="true">▰</span>
+            <span>Pocket</span>
+          </button>
+
+          <button class="desktop-icon desktop-icon-second" type="button" data-scroll-target="#emotes">
+            <span class="spark-icon" aria-hidden="true">✦</span>
+            <span>Emotes</span>
+          </button>
+
+          <div class="terminal-window" aria-hidden="true">
+            <div class="window-bar">
+              <span class="window-dot"></span>
+              <span class="window-dot"></span>
+              <span class="window-dot"></span>
+              <span>mikachu@fedora</span>
+            </div>
+            <div class="terminal-body">
+              <span class="terminal-prompt">❯</span> <span>mochi --debug</span><br />
+              <span class="terminal-muted">INFO mochi: little guy online</span><br />
+              <span class="terminal-prompt">❯</span> <span class="cursor-block"></span>
+            </div>
+          </div>
+
+          <div class="speech-bubble" id="hero-speech" role="status">
+            psst — you can drag me around
+          </div>
+
+          <button
+            class="hero-mochi"
+            id="hero-mochi"
+            type="button"
+            aria-label="Mochi. Click for a reaction or drag him around the desktop."
+          >
+            <img id="hero-mochi-img" src="animation-gifs/idle.gif" alt="Mochi idling" draggable="false" />
+          </button>
+
+          <p class="desktop-hint">click Mochi · drag Mochi · click the desktop icons</p>
+        </div>
+      </div>
     </section>
 
-    <hr />
-
-    <section id="install">
-      <h2>Install</h2>
-      <p>On Fedora, clone the repository (this installs current main, not a pinned release):</p>
-      <pre><code>git clone https://github.com/miflow13/mochi-desktop.git</code></pre>
-
-      <p>Then run:</p>
-      <pre><code>cd mochi-desktop
-./install.sh</code></pre>
-
-      <p>
-        After installation, open <strong>Mochi</strong> from the GNOME app grid.
-        You can also run <code>~/.local/bin/mochi</code>.
-      </p>
-      <p>
-        The installer may use <code>sudo dnf</code> for missing Fedora packages.
-        On first GNOME Wayland installation, log out and back in once so the
-        desktop-awareness helper can load. Without it, some reactions may be unavailable.
-      </p>
-      <p>
-        To update, quit Mochi, run <code>git pull --ff-only</code> from your clean
-        main checkout, rerun <code>./install.sh</code>, then relaunch Mochi.
-      </p>
-
-      <p>
-        <a href="https://github.com/miflow13/mochi-desktop#install">full install notes</a>
-        ·
-        <a href="https://github.com/miflow13/mochi-desktop#reporting-bugs">how to report a bug</a>
-      </p>
+    <section class="marquee-strip" aria-label="Mochi feature highlights">
+      <div class="marquee-track">
+        <span>🐸 desktop buddy</span>
+        <span>✦ handcrafted pixels</span>
+        <span>⌁ local awareness</span>
+        <span>▰ Pocket</span>
+        <span>☕ tiny coworker</span>
+        <span>♡ no streaks</span>
+        <span>⌨ open source</span>
+        <span aria-hidden="true">🐸 desktop buddy</span>
+        <span aria-hidden="true">✦ handcrafted pixels</span>
+        <span aria-hidden="true">⌁ local awareness</span>
+        <span aria-hidden="true">▰ Pocket</span>
+      </div>
     </section>
 
-    <hr />
+    <section class="section-shell story-section reveal" aria-labelledby="alive-title">
+      <div class="section-kicker">01 / not a widget</div>
+      <div class="story-grid">
+        <div>
+          <h2 id="alive-title">He’s meant to feel <em>alive</em>, not productive.</h2>
+          <p class="big-copy">
+            No streaks. No guilt. No “you missed yesterday.” Mochi is just a small
+            character sharing your desktop with you.
+          </p>
+        </div>
 
-    <section>
-      <h2>Status</h2>
-      <p><strong>Stage:</strong> early public alpha</p>
-      <p><strong>Platform:</strong> Fedora + GNOME + Wayland/XWayland</p>
-      <p>Niri is experimental. Other desktops, multi-monitor layouts, and fractional scaling receive less testing.</p>
-      <p>
-        Known issues remain open: a GNOME Overview/workspace freeze during emotes
-        (<a href="https://github.com/miflow13/mochi-desktop/issues/45">#45, alpha blocker</a>)
-        and delayed drag-direction poses
-        (<a href="https://github.com/miflow13/mochi-desktop/issues/68">#68, under investigation</a>).
-      </p>
-      <p>
-        See the <a href="https://github.com/miflow13/mochi-desktop/issues/37">alpha QA checklist</a>
-        and <a href="https://github.com/miflow13/mochi-desktop/blob/main/CHANGELOG.md#release-metadata-note">release/version notes</a>.
-        This is not a stable release.
-      </p>
-      <p><strong>Source:</strong> <a href="https://github.com/miflow13/mochi-desktop">github.com/miflow13/mochi-desktop</a></p>
+        <div class="feature-stack">
+          <article class="feature-window">
+            <div class="mini-window-bar"><span>ambient://personality</span><span>● ● ●</span></div>
+            <h3>He notices the broad stuff.</h3>
+            <p>Typing, coding, music, terminals, idle time, power changes—and then decides whether to react.</p>
+          </article>
+          <article class="feature-window">
+            <div class="mini-window-bar"><span>bond://local</span><span>● ● ●</span></div>
+            <h3>He remembers time together.</h3>
+            <p>Bond grows through normal interaction, without decay or punishment for going away.</p>
+          </article>
+          <article class="feature-window">
+            <div class="mini-window-bar"><span>state://nap</span><span>● ● ●</span></div>
+            <h3>Sometimes he just falls asleep.</h3>
+            <p>Honestly? Same.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pocket-section reveal" id="pocket" aria-labelledby="pocket-title">
+      <div class="section-shell">
+        <div class="section-kicker light">02 / try Pocket</div>
+        <div class="pocket-heading">
+          <div>
+            <h2 id="pocket-title">Give Mochi something<br />to hold onto.</h2>
+            <p>
+              Pocket is a local-first shelf for files, folders, links, text, and dropped images.
+              On the real app, originals stay where they are.
+            </p>
+          </div>
+          <div class="pocket-counter" aria-live="polite">
+            <span id="pocket-count">Pocket · 0</span>
+            <button type="button" id="pocket-clear" disabled>Clear demo</button>
+          </div>
+        </div>
+
+        <div class="pocket-playground">
+          <div class="fake-files" aria-label="Demo items to give Mochi">
+            <article class="fake-file" draggable="true" data-pocket-item="notes.txt" tabindex="0">
+              <span class="file-glyph">TXT</span>
+              <div>
+                <strong>notes.txt</strong>
+                <small>tiny important thoughts</small>
+              </div>
+              <button type="button" class="add-pocket-button">Give to Mochi</button>
+            </article>
+
+            <article class="fake-file" draggable="true" data-pocket-item="portfolio/" tabindex="0">
+              <span class="file-glyph folder">DIR</span>
+              <div>
+                <strong>portfolio/</strong>
+                <small>a whole folder</small>
+              </div>
+              <button type="button" class="add-pocket-button">Give to Mochi</button>
+            </article>
+
+            <article class="fake-file" draggable="true" data-pocket-item="dev.to/mochi" tabindex="0">
+              <span class="file-glyph link">URL</span>
+              <div>
+                <strong>dev.to/mochi</strong>
+                <small>a link for later</small>
+              </div>
+              <button type="button" class="add-pocket-button">Give to Mochi</button>
+            </article>
+
+            <p class="playground-note">
+              On desktop, you can also drag one of these cards onto Mochi. Or drop a real local file here—
+              this demo only reads its filename in your browser.
+            </p>
+          </div>
+
+          <div class="pocket-dropzone" id="pocket-dropzone">
+            <div class="pocket-glow" aria-hidden="true"></div>
+            <img id="pocket-mochi-img" src="animation-gifs/idle.gif" alt="Mochi waiting for a Pocket item" />
+            <p id="pocket-status">drop something on Mochi</p>
+          </div>
+
+          <div class="pocket-window-demo" aria-label="Pocket contents demo">
+            <div class="mini-window-bar"><span id="pocket-window-title">Pocket · 0</span><span>×</span></div>
+            <div class="pocket-list" id="pocket-list">
+              <p class="empty-pocket">Nothing here yet.<br /><span>Mochi has room for ten things in the real app.</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell emote-section reveal" id="emotes" aria-labelledby="emote-title">
+      <div class="section-kicker">03 / poke the creature</div>
+      <div class="emote-layout">
+        <div class="emote-copy">
+          <h2 id="emote-title">A tiny animation<br />playground.</h2>
+          <p>
+            Every reaction is authored frame by frame. Pick one and bother Mochi.
+          </p>
+
+          <div class="emote-controls" role="group" aria-label="Choose a Mochi animation">
+            <button type="button" class="emote-button active" data-emote="idle" data-src="animation-gifs/idle.gif">Idle</button>
+            <button type="button" class="emote-button" data-emote="bounce" data-src="animation-gifs/bounce.gif">Bounce</button>
+            <button type="button" class="emote-button" data-emote="squish" data-src="animation-gifs/squish.gif">Squish</button>
+            <button type="button" class="emote-button" data-emote="walk" data-src="animation-gifs/walk.gif">Walk</button>
+            <button type="button" class="emote-button" data-emote="sleep" data-src="animation-gifs/sleeping.gif">Nap</button>
+          </div>
+        </div>
+
+        <div class="emote-stage">
+          <div class="pixel-grid" aria-hidden="true"></div>
+          <img id="emote-preview" src="animation-gifs/idle.gif" alt="Mochi idle animation preview" />
+          <div class="emote-label"><span id="emote-name">idle</span><span>hand-authored pixels</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="privacy-section reveal" id="privacy" aria-labelledby="privacy-title">
+      <div class="section-shell">
+        <div class="section-kicker light">04 / AmbiSense</div>
+        <div class="privacy-grid">
+          <div>
+            <h2 id="privacy-title">Aware of your desktop.<br /><em>Not reading it.</em></h2>
+            <p class="big-copy">
+              Mochi’s awareness is local and rule-based. It works from coarse signals,
+              not your words, document names, window titles, or screen contents.
+            </p>
+          </div>
+
+          <div class="signal-flow" aria-label="How AmbiSense reduces desktop activity">
+            <div class="signal-node">
+              <span class="signal-icon">⌨</span>
+              <div><strong>activity</strong><small>you type</small></div>
+            </div>
+            <div class="signal-arrow" aria-hidden="true">→</div>
+            <div class="signal-node">
+              <span class="signal-icon">≈</span>
+              <div><strong>coarse signal</strong><small>“typing pulse”</small></div>
+            </div>
+            <div class="signal-arrow" aria-hidden="true">→</div>
+            <div class="signal-node">
+              <img src="assets/mochi/idle/idle_01.png" alt="" />
+              <div><strong>Mochi decides</strong><small>react or chill</small></div>
+            </div>
+          </div>
+
+          <div class="never-reads">
+            <span>never reads</span>
+            <ul>
+              <li>typed characters</li>
+              <li>words or passwords</li>
+              <li>window titles</li>
+              <li>document names</li>
+              <li>screen contents</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell install-section reveal" id="install" aria-labelledby="install-title">
+      <div class="section-kicker">05 / bring him home</div>
+      <div class="install-grid">
+        <div>
+          <h2 id="install-title">Three commands.<br />One new roommate.</h2>
+          <p>
+            Fedora + GNOME + Wayland is the primary tested setup. Other Linux desktops
+            are increasingly supported, but this is still alpha software.
+          </p>
+          <div class="install-links">
+            <a href="https://github.com/miflow13/mochi-desktop#install">Full install notes ↗</a>
+            <a href="https://github.com/miflow13/mochi-desktop/issues">Report a bug ↗</a>
+          </div>
+        </div>
+
+        <div class="install-terminal">
+          <div class="terminal-header">
+            <span>Terminal</span>
+            <button type="button" id="copy-install">Copy commands</button>
+          </div>
+          <pre id="install-command"><code><span class="prompt">$</span> git clone https://github.com/miflow13/mochi-desktop.git
+<span class="prompt">$</span> cd mochi-desktop
+<span class="prompt">$</span> ./install.sh</code></pre>
+          <p id="copy-status" class="copy-status" aria-live="polite">current main · v0.4 alpha line</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="contribute-section reveal" id="contribute" aria-labelledby="contribute-title">
+      <div class="section-shell">
+        <div class="section-kicker light">06 / make Mochi weirder</div>
+        <div class="contribute-grid">
+          <div>
+            <h2 id="contribute-title">You don’t have to write Python to contribute.</h2>
+            <p>
+              Mochi’s canonical Artist Kit is public: master reference, production sprites,
+              exact dimensions, anchoring rules, animation conventions, and a submission template.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-light" href="artist-kit/README.md">Open Artist Kit</a>
+              <a class="button button-ghost-light" href="CONTRIBUTING.md">Contributor guide</a>
+            </div>
+          </div>
+
+          <div class="artist-desk">
+            <div class="sprite-card sprite-card-one">
+              <img src="assets/mochi/idle/idle_01.png" alt="Mochi canonical idle sprite" />
+              <span>canonical</span>
+            </div>
+            <div class="sprite-card sprite-card-two">
+              <img src="assets/mochi/heart/heart_08.png" alt="A frame from Mochi's heart animation" />
+              <span>animate</span>
+            </div>
+            <div class="sprite-card sprite-card-three">
+              <img src="assets/mochi/coffee/mochi_coffee_0008.png" alt="A frame from Mochi's coffee animation" />
+              <span>contribute</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="community-line">
+          <span>Mochi is becoming a community project.</span>
+          <a href="https://github.com/miflow13/mochi-desktop/graphs/contributors">Meet the contributors ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell status-section reveal" aria-labelledby="status-title">
+      <div class="status-card">
+        <div>
+          <span class="status-dot large" aria-hidden="true"></span>
+          <div>
+            <strong id="status-title">v0.4.0-alpha.1 · Pocket &amp; Polish</strong>
+            <span>Fedora + GNOME + Wayland is the primary tested environment.</span>
+          </div>
+        </div>
+        <a href="CHANGELOG.md">Read the changelog ↗</a>
+      </div>
     </section>
   </main>
 
-  <hr />
-
-  <footer>
-    <p>mochi is made by Mika. Handcrafted with love and too many sprite frames.</p>
-    <p class="small">last updated: september 2026</p>
+  <footer class="site-footer">
+    <div>
+      <img src="assets/mochi/idle/idle_01.png" alt="" width="46" height="46" />
+      <p><strong>A few pixels. A little personality.</strong><br />Growing together, one tiny interaction at a time. 🌱</p>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/miflow13/mochi-desktop">GitHub</a>
+      <a href="artist-kit/README.md">Artist Kit</a>
+      <a href="CHANGELOG.md">Changelog</a>
+      <a href="LICENSE">MIT License</a>
+    </div>
   </footer>
 </body>
 </html>
