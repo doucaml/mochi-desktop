@@ -144,7 +144,7 @@ class PocketDropAdapter:
 
     def _drag_action(self) -> Gdk.DragAction:
         accepted = self._controller.begin_hover()
-        return Gdk.DragAction.COPY if accepted else Gdk.DragAction.NONE
+        return Gdk.DragAction.COPY if accepted else Gdk.DragAction(0)
 
     def _on_drop(self, value: object, receive: Callable[[Any], bool]) -> bool:
         if not self._controller.begin_hover():
