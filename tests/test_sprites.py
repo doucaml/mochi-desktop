@@ -154,6 +154,39 @@ class SpriteDefinitionsTests(unittest.TestCase):
             self.assertFalse(any(row[: margin * 4]))
             self.assertFalse(any(row[(size - margin) * 4 : size * 4]))
 
+
+    def test_pocket_glow_remains_visible_outside_sprite_bounds_at_widget_size(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        size = 112
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+
+        atlas.draw_glow(cairo.Context(surface), frame, size, size, pulse=1.0)
+        surface.flush()
+
+        x, y, width, height = atlas.visible_bounds(frame, size, size)
+        left = max(0, int(x))
+        top = max(0, int(y))
+        right = min(size, int(x + width + 0.999))
+        bottom = min(size, int(y + height + 0.999))
+        data = bytes(surface.get_data())
+        stride = surface.get_stride()
+
+        outside_sprite_has_glow = False
+        for py in range(size):
+            row = data[py * stride : (py + 1) * stride]
+            for px in range(size):
+                if left <= px < right and top <= py < bottom:
+                    continue
+                pixel = row[px * 4 : (px + 1) * 4]
+                if any(pixel):
+                    outside_sprite_has_glow = True
+                    break
+            if outside_sprite_has_glow:
+                break
+
+        self.assertTrue(outside_sprite_has_glow)
+
     def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
         with (project_root / "pyproject.toml").open("rb") as stream:
