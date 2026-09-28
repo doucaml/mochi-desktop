@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import gi
 
@@ -34,13 +34,40 @@ def items_from_file_payload(files: Iterable[object]) -> tuple[PocketItem, ...]:
     return tuple(items)
 
 
+def _existing_local_path_from_string(candidate: str) -> Path | None:
+    """Resolve supported string representations of local existing paths."""
+    parsed = urlsplit(candidate)
+    if parsed.scheme.lower() == "file":
+        if parsed.netloc not in {"", "localhost"}:
+            raise ValueError("Pocket file URI must reference this computer")
+        if parsed.query or parsed.fragment:
+            raise ValueError("Pocket file URI must not include query or fragment")
+        path = Path(unquote(parsed.path))
+        if not path.is_absolute() or not path.exists():
+            raise ValueError("Pocket file URI does not reference an available local path")
+        return path
+
+    if parsed.scheme:
+        return None
+
+    path = Path(candidate).expanduser()
+    if path.is_absolute() and path.exists():
+        return path
+    return None
+
+
 def items_from_string_payload(value: str) -> PocketItem:
-    """Classify a GTK string as HTTP(S) URL or literal text."""
+    """Classify a GTK string as local path, HTTP(S) URL, or literal text."""
     if not isinstance(value, str):
         raise TypeError("Pocket string payload must be text")
     candidate = value.strip()
     if not candidate:
         raise ValueError("Pocket string payload must not be empty")
+
+    local_path = _existing_local_path_from_string(candidate)
+    if local_path is not None:
+        return make_local_file_item(local_path)
+
     parsed = urlsplit(candidate)
     if parsed.scheme:
         if parsed.scheme.lower() not in {"http", "https"}:
