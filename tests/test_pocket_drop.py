@@ -144,8 +144,55 @@ def test_string_payload_classifies_http_urls_before_plain_text() -> None:
     assert path_like_text.value == "/tmp/example.txt"
 
 
-@pytest.mark.parametrize("value", ["", "   ", "file:///tmp/a", "mailto:a@b.test"])
-def test_empty_or_unsupported_uri_strings_are_rejected(value: str) -> None:
+def test_string_payload_classifies_existing_absolute_file_and_directory_paths(
+    tmp_path: Path,
+) -> None:
+    file_path = tmp_path / "note.txt"
+    file_path.write_text("hello", encoding="utf-8")
+    directory_path = tmp_path / "folder"
+    directory_path.mkdir()
+
+    file_item = items_from_string_payload(str(file_path))
+    directory_item = items_from_string_payload(str(directory_path))
+
+    assert file_item.kind is PocketItemKind.LOCAL_FILE
+    assert file_item.value == str(file_path.resolve())
+    assert directory_item.kind is PocketItemKind.LOCAL_FILE
+    assert directory_item.value == str(directory_path.resolve())
+
+
+def test_string_payload_classifies_existing_file_uri_with_escaped_spaces(
+    tmp_path: Path,
+) -> None:
+    file_path = tmp_path / "with space.txt"
+    file_path.write_text("hello", encoding="utf-8")
+
+    item = items_from_string_payload(file_path.as_uri())
+
+    assert item.kind is PocketItemKind.LOCAL_FILE
+    assert item.value == str(file_path.resolve())
+
+
+def test_nonexistent_absolute_path_text_remains_literal_text(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.txt"
+
+    item = items_from_string_payload(str(missing))
+
+    assert item.kind is PocketItemKind.TEXT
+    assert item.value == str(missing)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        "file:///definitely-does-not-exist/mochi-pocket.txt",
+        "file://example.com/tmp/mochi-pocket.txt",
+        "mailto:a@b.test",
+    ],
+)
+def test_empty_unsupported_or_unavailable_uri_strings_are_rejected(value: str) -> None:
     with pytest.raises(ValueError):
         items_from_string_payload(value)
 
