@@ -177,8 +177,11 @@ class SpriteAtlas:
         frame: AnimationFrame,
         width: int,
         height: int,
+        *,
+        pulse: float = 0.5,
     ) -> None:
-        """Paint a soft Pocket acceptance glow around the visible sprite."""
+        """Paint a soft breathing Pocket acceptance glow around the sprite."""
+        pulse = max(0.0, min(1.0, float(pulse)))
         x, y, visible_width, visible_height = self.visible_bounds(
             frame,
             width,
@@ -186,17 +189,43 @@ class SpriteAtlas:
         )
         center_x = x + visible_width / 2
         center_y = y + visible_height / 2
-        radius_x = max(1.0, visible_width * 0.72)
-        radius_y = max(1.0, visible_height * 0.72)
+
+        breath_scale = 0.92 + 0.12 * pulse
+        radius_x = max(1.0, visible_width * 0.78 * breath_scale)
+        radius_y = max(1.0, visible_height * 0.78 * breath_scale)
+        outer_alpha = 0.18 + 0.10 * pulse
+        inner_alpha = 0.24 + 0.10 * pulse
 
         context.save()
         context.translate(center_x, center_y)
         context.scale(radius_x, radius_y)
-        glow = cairo.RadialGradient(0.0, 0.0, 0.08, 0.0, 0.0, 1.0)
-        glow.add_color_stop_rgba(0.0, 0.475, 0.788, 0.545, 0.34)
-        glow.add_color_stop_rgba(0.55, 0.475, 0.788, 0.545, 0.18)
-        glow.add_color_stop_rgba(1.0, 0.475, 0.788, 0.545, 0.0)
-        context.set_source(glow)
+
+        outer = cairo.RadialGradient(0.0, 0.0, 0.08, 0.0, 0.0, 1.0)
+        outer.add_color_stop_rgba(0.0, 0.475, 0.788, 0.545, outer_alpha)
+        outer.add_color_stop_rgba(
+            0.58,
+            0.475,
+            0.788,
+            0.545,
+            outer_alpha * 0.58,
+        )
+        outer.add_color_stop_rgba(1.0, 0.475, 0.788, 0.545, 0.0)
+        context.set_source(outer)
+        context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
+        context.fill()
+
+        context.scale(0.68, 0.68)
+        inner = cairo.RadialGradient(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        inner.add_color_stop_rgba(0.0, 0.56, 0.88, 0.63, inner_alpha)
+        inner.add_color_stop_rgba(
+            0.72,
+            0.56,
+            0.88,
+            0.63,
+            inner_alpha * 0.32,
+        )
+        inner.add_color_stop_rgba(1.0, 0.56, 0.88, 0.63, 0.0)
+        context.set_source(inner)
         context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
         context.fill()
         context.restore()
