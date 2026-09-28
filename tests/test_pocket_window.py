@@ -69,6 +69,38 @@ def test_open_file_and_url_use_validated_uris(tmp_path: Path) -> None:
 
     assert launched == [path.as_uri(), "https://example.com/page"]
 
+def test_local_file_row_can_open_its_containing_folder(tmp_path: Path) -> None:
+    folder = tmp_path / "documents"
+    folder.mkdir()
+    path = folder / "note.txt"
+    path.write_text("hello", encoding="utf-8")
+    file_item = make_local_file_item(path)
+    text_item = make_text_item("hello")
+    launched = []
+    window = PocketWindow(
+        _Controller((file_item, text_item)),
+        launcher=launched.append,
+    )
+
+    file_row = window.rows[file_item.id]
+    assert file_row.folder_button is not None
+    assert file_row.folder_button.get_sensitive() is True
+    assert window.rows[text_item.id].folder_button is None
+
+    file_row.folder_button.emit("clicked")
+
+    assert launched == [folder.as_uri()]
+
+
+def test_missing_local_file_disables_containing_folder_action(tmp_path: Path) -> None:
+    item = make_local_file_item(tmp_path / "missing.txt")
+    window = PocketWindow(_Controller((item,)))
+
+    folder_button = window.rows[item.id].folder_button
+
+    assert folder_button is not None
+    assert folder_button.get_sensitive() is False
+
 
 def test_text_opens_in_a_read_only_detail_window() -> None:
     item = make_text_item("full\ntext")
