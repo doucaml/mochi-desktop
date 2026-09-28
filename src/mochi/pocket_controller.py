@@ -156,6 +156,20 @@ class PocketController:
         self._on_changed(self._items)
         return True
 
+    def clear_all(self) -> bool:
+        """Clear Pocket metadata without ever deleting original user files."""
+        if not self._items:
+            return True
+        try:
+            remaining = self._store.clear(self._items)
+        except OSError as error:
+            self._logger.warning("Could not clear Pocket: %s", error)
+            self._show_feedback("I couldn't update Pocket")
+            return False
+        self._items = tuple(remaining)
+        self._on_changed(self._items)
+        return True
+
     def _persist_and_react(self, candidates: tuple[PocketItem, ...]) -> bool:
         try:
             mutation = self._store.add_items(self._items, candidates)
