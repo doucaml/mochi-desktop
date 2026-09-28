@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  document.documentElement.classList.add("js");
+
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const clock = document.getElementById("desktop-clock");
@@ -120,6 +122,12 @@
 
     heroMochi.addEventListener("pointerup", finishPointer);
     heroMochi.addEventListener("pointercancel", finishPointer);
+    heroMochi.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setHeroReaction();
+      }
+    });
   }
 
   const pocketDropzone = document.getElementById("pocket-dropzone");
