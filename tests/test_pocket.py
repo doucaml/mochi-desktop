@@ -36,6 +36,12 @@ def test_url_item_accepts_only_http_and_https_and_normalizes_host() -> None:
     with pytest.raises(ValueError):
         make_url_item("javascript:alert(1)")
 
+def test_url_normalization_preserves_userinfo_case_and_port() -> None:
+    item = make_url_item("HTTPS://User:PaSS@Example.COM:8443/path")
+
+    assert item.value == "https://User:PaSS@example.com:8443/path"
+
+
 
 def test_text_item_preserves_path_like_text_as_text() -> None:
     item = make_text_item("/tmp/example.txt", received_at=3)
