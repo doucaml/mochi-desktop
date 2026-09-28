@@ -159,3 +159,47 @@ def test_remove_managed_image_deletes_image_but_remove_local_file_never_does(
     remaining = store.remove(remaining, local.id)
     assert external.exists()
     assert remaining == []
+
+
+
+def test_clear_persists_empty_pocket_then_deletes_only_managed_images(
+    tmp_path: Path,
+) -> None:
+    store = PocketStore(path=tmp_path / "pocket.json", images_dir=tmp_path / "images")
+    external = tmp_path / "keep.txt"
+    external.write_text("keep", encoding="utf-8")
+    local = make_local_file_item(external, received_at=1)
+    image = store.save_raw_image(b"image", received_at=2)
+    current = list(store.add_items([], [local, image]).items)
+
+    remaining = store.clear(current)
+
+    assert remaining == []
+    assert store.load() == []
+    assert external.exists()
+    assert not Path(image.value).exists()
+
+
+def test_clear_save_failure_preserves_items_and_managed_images(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = PocketStore(path=tmp_path / "pocket.json", images_dir=tmp_path / "images")
+    image = store.save_raw_image(b"image", received_at=2)
+    current = list(store.add_items([], [make_text_item("keep"), image]).items)
+    before = store.path.read_text(encoding="utf-8")
+    image_path = Path(image.value)
+    original_replace = Path.replace
+
+    def fail_metadata_replace(self: Path, target: Path):
+        if self.name.endswith(".tmp") and target == store.path:
+            raise OSError("metadata write failed")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", fail_metadata_replace)
+
+    with pytest.raises(OSError, match="metadata write failed"):
+        store.clear(current)
+
+    assert store.path.read_text(encoding="utf-8") == before
+    assert image_path.exists()
