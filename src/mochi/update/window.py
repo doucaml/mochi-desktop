@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from collections.abc import Callable
@@ -127,6 +128,12 @@ class UpdaterSprite(Gtk.DrawingArea):
         self.queue_draw()
 
     def _load_frames(self, animation: str) -> list[cairo.ImageSurface]:
+        metadata = self._animation_metadata(animation)
+        if metadata is not None and "spritesheet" in metadata:
+            frames = self._load_spritesheet_frames(metadata)
+            if frames:
+                return frames
+
         folder = self.asset_root / animation
         if not folder.is_dir():
             return []
@@ -137,6 +144,70 @@ class UpdaterSprite(Gtk.DrawingArea):
                 frames.append(cairo.ImageSurface.create_from_png(str(path)))
             except (cairo.Error, OSError):
                 continue
+        return frames
+
+    def _animation_metadata(self, animation: str) -> dict[str, object] | None:
+        manifest_path = self.asset_root / "manifest.json"
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict):
+            return None
+        animations = payload.get("animations")
+        if not isinstance(animations, dict):
+            return None
+        metadata = animations.get(animation)
+        return metadata if isinstance(metadata, dict) else None
+
+    def _load_spritesheet_frames(
+        self,
+        metadata: dict[str, object],
+    ) -> list[cairo.ImageSurface]:
+        relative_path = metadata.get("spritesheet")
+        source_cell_size = metadata.get("source_cell_size")
+        frame_count = metadata.get("frame_count")
+        if (
+            not isinstance(relative_path, str)
+            or not isinstance(source_cell_size, list)
+            or len(source_cell_size) != 2
+            or not all(isinstance(value, int) and value > 0 for value in source_cell_size)
+            or not isinstance(frame_count, int)
+            or frame_count < 1
+        ):
+            return []
+
+        cell_width, cell_height = source_cell_size
+        try:
+            sheet = cairo.ImageSurface.create_from_png(
+                str(self.asset_root / relative_path)
+            )
+        except (cairo.Error, OSError):
+            return []
+
+        columns = sheet.get_width() // cell_width
+        rows = sheet.get_height() // cell_height
+        if columns < 1 or rows < 1 or frame_count > columns * rows:
+            return []
+
+        frames: list[cairo.ImageSurface] = []
+        for index in range(frame_count):
+            column = index % columns
+            row = index // columns
+            frame = cairo.ImageSurface(
+                cairo.FORMAT_ARGB32,
+                cell_width,
+                cell_height,
+            )
+            context = cairo.Context(frame)
+            context.set_source_surface(
+                sheet,
+                -column * cell_width,
+                -row * cell_height,
+            )
+            context.paint()
+            frame.flush()
+            frames.append(frame)
         return frames
 
     def _replace_timer(self) -> None:

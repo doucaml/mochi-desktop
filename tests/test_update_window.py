@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import inspect
+import json
 from pathlib import Path
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -127,6 +129,40 @@ def test_sprite_renderer_explicitly_uses_nearest_neighbor() -> None:
     source = inspect.getsource(UpdaterSprite)
     assert "FILTER_NEAREST" in source
     assert issubclass(UpdaterSprite, Gtk.DrawingArea)
+
+
+def test_sprite_renderer_slices_manifest_spritesheet_into_frames(
+    tmp_path: Path,
+) -> None:
+    wave_dir = tmp_path / "wave"
+    wave_dir.mkdir()
+    manifest = {
+        "animations": {
+            "wave": {
+                "spritesheet": "wave/wave.png",
+                "frame_count": 3,
+                "source_cell_size": [2, 2],
+            }
+        }
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    sheet = cairo.ImageSurface(cairo.FORMAT_ARGB32, 6, 2)
+    context = cairo.Context(sheet)
+    for index, intensity in enumerate((0.2, 0.5, 0.8)):
+        context.set_source_rgba(intensity, 1.0 - intensity, 0.3, 1.0)
+        context.rectangle(index * 2, 0, 2, 2)
+        context.fill()
+    sheet.write_to_png(str(wave_dir / "wave.png"))
+
+    sprite = UpdaterSprite(asset_root=tmp_path, animation="wave")
+
+    assert len(sprite._frames) == 3
+    assert {
+        (frame.get_width(), frame.get_height())
+        for frame in sprite._frames
+    } == {(2, 2)}
+    assert len({bytes(frame.get_data()) for frame in sprite._frames}) == 3
 
 
 def test_safe_pre_swap_stages_offer_cancel_when_external_callback_exists(

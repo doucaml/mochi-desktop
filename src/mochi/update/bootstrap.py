@@ -139,6 +139,10 @@ def bootstrap_updater(
             else:
                 destination.mkdir(parents=True, exist_ok=True)
 
+        manifest = selected_assets / "manifest.json"
+        if manifest.is_file():
+            shutil.copy2(manifest, copied_asset_root / "manifest.json")
+
         request = {
             "commit": target.commit,
             "version": target.metadata.version,
