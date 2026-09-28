@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+
+import pytest
 
 from mochi.pocket_integration import PocketBuddyMixin
 from mochi.presence.click_dialogue import PresenceBuddy, PresenceX11Buddy
@@ -108,7 +110,7 @@ class _DrawHarness(PocketBuddyMixin, _DrawBase):
     pass
 
 
-def test_pocket_hover_draws_sprite_glow_before_normal_render() -> None:
+def test_pocket_hover_draws_breathing_glow_before_normal_render() -> None:
     harness = object.__new__(_DrawHarness)
     frame = object()
     harness._pocket_controller = SimpleNamespace(hover_active=True)
@@ -116,10 +118,44 @@ def test_pocket_hover_draws_sprite_glow_before_normal_render() -> None:
     harness.atlas = Mock()
     harness.base_draws = []
 
-    harness._draw("area", "context", 112, 112)
+    with patch(
+        "mochi.pocket_integration.time.monotonic",
+        side_effect=(10.0, 10.575),
+    ):
+        harness._draw("area", "context", 112, 112)
+        harness._draw("area", "context", 112, 112)
 
-    harness.atlas.draw_glow.assert_called_once_with("context", frame, 112, 112)
-    assert harness.base_draws == [("area", "context", 112, 112)]
+    first_call, second_call = harness.atlas.draw_glow.call_args_list
+    assert first_call.args == ("context", frame, 112, 112)
+    assert first_call.kwargs["pulse"] == pytest.approx(0.0)
+    assert second_call.args == ("context", frame, 112, 112)
+    assert second_call.kwargs["pulse"] == pytest.approx(1.0)
+    assert harness.base_draws == [
+        ("area", "context", 112, 112),
+        ("area", "context", 112, 112),
+    ]
+
+
+def test_pocket_glow_phase_resets_after_hover_ends() -> None:
+    harness = object.__new__(_DrawHarness)
+    frame = object()
+    harness._pocket_controller = SimpleNamespace(hover_active=True)
+    harness.player = SimpleNamespace(frame=frame)
+    harness.atlas = Mock()
+    harness.base_draws = []
+
+    with patch(
+        "mochi.pocket_integration.time.monotonic",
+        side_effect=(20.0, 20.2, 30.0),
+    ):
+        harness._draw("area", "context", 112, 112)
+        harness._draw("area", "context", 112, 112)
+        harness._pocket_controller.hover_active = False
+        harness._draw("area", "context", 112, 112)
+        harness._pocket_controller.hover_active = True
+        harness._draw("area", "context", 112, 112)
+
+    assert harness.atlas.draw_glow.call_args_list[-1].kwargs["pulse"] == pytest.approx(0.0)
 
 
 def test_normal_render_skips_pocket_glow_when_not_hovering() -> None:
