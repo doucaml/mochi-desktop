@@ -37,26 +37,36 @@ class PocketStore:
         self.images_dir = images_dir or root / "images"
         self._logger = logging.getLogger(__name__)
         self._corrupt_loaded = False
+        self._load_failed = False
 
     def load(self) -> list[PocketItem]:
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             self._corrupt_loaded = False
+            self._load_failed = False
             return []
-        except json.JSONDecodeError as error:
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
             self._logger.warning("Pocket data is corrupt at %s: %s", self.path, error)
             self._corrupt_loaded = True
+            self._load_failed = False
+            return []
+        except OSError as error:
+            self._logger.warning("Could not read Pocket data at %s: %s", self.path, error)
+            self._corrupt_loaded = False
+            self._load_failed = True
             return []
 
         if not isinstance(payload, dict) or payload.get("version") != self.FORMAT_VERSION:
             self._logger.warning("Pocket data has an invalid top-level format at %s", self.path)
             self._corrupt_loaded = True
+            self._load_failed = False
             return []
         records = payload.get("items")
         if not isinstance(records, list):
             self._logger.warning("Pocket data has an invalid item list at %s", self.path)
             self._corrupt_loaded = True
+            self._load_failed = False
             return []
 
         items: list[PocketItem] = []
@@ -71,6 +81,7 @@ class PocketStore:
                     "Ignoring malformed Pocket record %d: %s", index, error
                 )
         self._corrupt_loaded = False
+        self._load_failed = False
         return items
 
     def add_items(
@@ -134,6 +145,10 @@ class PocketStore:
         return make_saved_image_item(final_path, received_at=received_at)
 
     def _save_items(self, items: Iterable[PocketItem]) -> None:
+        if self._load_failed:
+            raise OSError(
+                "Pocket data could not be read safely; refusing to overwrite it"
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self._corrupt_loaded and self.path.exists():
             backup = self.path.with_name(
