@@ -31,6 +31,11 @@ class _Store:
         self.items = [item for item in current if item.id != item_id]
         return list(self.items)
 
+    def clear(self, current):
+        self.events.append("clear")
+        self.items = []
+        return []
+
     def save_raw_image(self, png_bytes):
         self.events.append("save-image")
         return make_saved_image_item("/tmp/managed-pocket-image.png")
@@ -427,3 +432,58 @@ def test_pocket_reaction_uses_normal_idle_completion_contract() -> None:
 
     assert "play:pocket_grab:idle" in interaction.events
     assert can_transition(MochiState.EXCITED, MochiState.IDLE)
+
+
+
+def test_clear_all_persists_then_publishes_empty_count() -> None:
+    store = _Store()
+    store.items = [make_text_item("one"), make_text_item("two")]
+    interaction = _Interaction()
+    changed: list[int] = []
+    controller = PocketController(
+        store,
+        current_state=interaction.current_state,
+        cancel_walk=interaction.cancel_walk,
+        cancel_ambient=interaction.cancel_ambient,
+        transition=interaction.transition,
+        play_animation=interaction.play,
+        mark_interaction=interaction.mark_interaction,
+        resume_ambient=interaction.resume_ambient,
+        show_feedback=interaction.show_feedback,
+        on_changed=lambda items: changed.append(len(items)),
+    )
+
+    assert controller.clear_all() is True
+
+    assert store.events == ["clear"]
+    assert controller.items == ()
+    assert controller.count == 0
+    assert changed == [0]
+
+
+def test_clear_all_empty_pocket_is_successful_noop() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+
+    assert controller.clear_all() is True
+
+    assert store.events == []
+    assert controller.items == ()
+
+
+def test_failed_clear_all_preserves_live_items_and_reports_feedback() -> None:
+    item = make_text_item("keep me")
+    store = _Store()
+    store.items = [item]
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+
+    def fail_clear(current):
+        raise OSError("read only")
+
+    store.clear = fail_clear
+
+    assert controller.clear_all() is False
+    assert controller.items == (item,)
+    assert interaction.feedback == ["I couldn't update Pocket"]
