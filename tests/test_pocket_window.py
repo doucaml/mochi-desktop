@@ -130,6 +130,17 @@ def test_text_opens_in_a_read_only_detail_window() -> None:
     start, end = detail.text_view.get_buffer().get_bounds()
     assert detail.text_view.get_buffer().get_text(start, end, True) == "full\ntext"
 
+def test_closed_text_detail_window_is_released_from_owner() -> None:
+    item = make_text_item("close me")
+    window = PocketWindow(_Controller((item,)))
+    assert window.open_item(item.id) is True
+    detail = window.detail_windows[-1]
+
+    detail.emit("close-request")
+
+    assert detail not in window.detail_windows
+
+
 
 def test_destroy_closes_owned_text_detail_windows() -> None:
     window = PocketWindow(_Controller())
