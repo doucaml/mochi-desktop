@@ -97,3 +97,39 @@ def test_shutdown_detaches_drop_adapter_and_destroys_window() -> None:
     assert harness._pocket_drop is None
     assert harness._pocket_window is None
     assert harness.base_shutdown is True
+
+
+class _DrawBase:
+    def _draw(self, area, context, width, height):
+        self.base_draws.append((area, context, width, height))
+
+
+class _DrawHarness(PocketBuddyMixin, _DrawBase):
+    pass
+
+
+def test_pocket_hover_draws_sprite_glow_before_normal_render() -> None:
+    harness = object.__new__(_DrawHarness)
+    frame = object()
+    harness._pocket_controller = SimpleNamespace(hover_active=True)
+    harness.player = SimpleNamespace(frame=frame)
+    harness.atlas = Mock()
+    harness.base_draws = []
+
+    harness._draw("area", "context", 112, 112)
+
+    harness.atlas.draw_glow.assert_called_once_with("context", frame, 112, 112)
+    assert harness.base_draws == [("area", "context", 112, 112)]
+
+
+def test_normal_render_skips_pocket_glow_when_not_hovering() -> None:
+    harness = object.__new__(_DrawHarness)
+    harness._pocket_controller = SimpleNamespace(hover_active=False)
+    harness.player = SimpleNamespace(frame=object())
+    harness.atlas = Mock()
+    harness.base_draws = []
+
+    harness._draw("area", "context", 112, 112)
+
+    harness.atlas.draw_glow.assert_not_called()
+    assert harness.base_draws == [("area", "context", 112, 112)]
