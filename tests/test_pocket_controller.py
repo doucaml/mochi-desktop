@@ -160,6 +160,37 @@ def test_hover_leave_does_not_overwrite_a_new_protected_owner() -> None:
     assert controller.hover_active is False
 
 
+def test_repeated_hover_rejects_after_a_new_protected_owner_takes_over() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+    assert controller.begin_hover()
+    interaction.events.clear()
+    interaction.state = MochiState.SLEEPING
+
+    assert controller.begin_hover() is False
+
+    assert interaction.events == []
+    assert interaction.state is MochiState.SLEEPING
+    assert controller.hover_active is False
+
+
+def test_drop_after_protected_takeover_releases_hover_without_writing() -> None:
+    store = _Store()
+    interaction = _Interaction()
+    controller = _controller(store, interaction)
+    assert controller.begin_hover()
+    interaction.events.clear()
+    interaction.state = MochiState.SLEEPING
+
+    assert controller.receive([make_text_item("note")]) is False
+
+    assert store.events == []
+    assert interaction.events == []
+    assert interaction.feedback == ["My paws are full"]
+    assert controller.hover_active is False
+
+
 @pytest.mark.parametrize(
     "state",
     [

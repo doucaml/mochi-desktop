@@ -205,6 +205,13 @@ class PocketWindow(Gtk.Window):
         self._empty.set_visible(self.empty_visible)
         self._scroll.set_visible(not self.empty_visible)
 
+    def destroy(self) -> None:
+        details = tuple(self.detail_windows)
+        self.detail_windows.clear()
+        for detail in details:
+            detail.destroy()
+        super().destroy()
+
     def open_item(self, item_id: str) -> bool:
         item = self._item(item_id)
         if item is None:

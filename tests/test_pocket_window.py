@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import Mock
 
 from mochi.pocket import (
     make_local_file_item,
@@ -81,6 +82,17 @@ def test_text_opens_in_a_read_only_detail_window() -> None:
     assert detail.text_view.get_cursor_visible() is False
     start, end = detail.text_view.get_buffer().get_bounds()
     assert detail.text_view.get_buffer().get_text(start, end, True) == "full\ntext"
+
+
+def test_destroy_closes_owned_text_detail_windows() -> None:
+    window = PocketWindow(_Controller())
+    detail = Mock()
+    window.detail_windows.append(detail)
+
+    window.destroy()
+
+    detail.destroy.assert_called_once_with()
+    assert window.detail_windows == []
 
 
 def test_remove_dispatches_to_controller_and_refreshes_rows() -> None:

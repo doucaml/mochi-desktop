@@ -70,7 +70,10 @@ class PocketController:
     def begin_hover(self) -> bool:
         """Claim presentation for one supported drag without restarting it."""
         if self._hover_active:
-            return True
+            if self._current_state() is MochiState.EXCITED:
+                return True
+            self._hover_active = False
+            return False
         if not self.can_receive():
             return False
 
@@ -106,6 +109,7 @@ class PocketController:
             return False
         if not self.can_receive():
             self._show_feedback("My paws are full")
+            self.end_hover()
             return False
 
         self._busy = True
@@ -118,6 +122,7 @@ class PocketController:
         """Save transient texture data and commit it as one Pocket transaction."""
         if not self.can_receive():
             self._show_feedback("My paws are full")
+            self.end_hover()
             return False
         self._busy = True
         try:
