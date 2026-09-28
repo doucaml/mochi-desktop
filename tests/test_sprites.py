@@ -61,6 +61,20 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertEqual(pickup.frame_duration_ms, PICKUP_FRAME_DURATION_MS)
         self.assertFalse(pickup.looping)
 
+    def test_pocket_grab_is_an_eight_frame_one_shot(self) -> None:
+        pocket_grab = ANIMATIONS["pocket_grab"]
+
+        self.assertEqual(len(pocket_grab.frames), 8)
+        self.assertEqual(pocket_grab.frame_duration_ms, 120)
+        self.assertFalse(pocket_grab.looping)
+        self.assertEqual(
+            set(ASSET_SET.load_frames("pocket_grab")),
+            {
+                f"pocket_grab/mochi_pocket_grab_{index:04}.png"
+                for index in range(1, 9)
+            },
+        )
+
     def test_drop_is_a_quick_six_frame_one_shot(self) -> None:
         drop = ANIMATIONS["drop"]
         self.assertEqual(len(drop.frames), 6)
