@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import math
 import sys
 
 import cairo
@@ -168,6 +169,36 @@ class SpriteAtlas:
         context.set_source_surface(sprite, 0, 0)
         context.get_source().set_filter(cairo.FILTER_NEAREST)
         context.paint()
+        context.restore()
+
+    def draw_glow(
+        self,
+        context: cairo.Context,
+        frame: AnimationFrame,
+        width: int,
+        height: int,
+    ) -> None:
+        """Paint a soft Pocket acceptance glow around the visible sprite."""
+        x, y, visible_width, visible_height = self.visible_bounds(
+            frame,
+            width,
+            height,
+        )
+        center_x = x + visible_width / 2
+        center_y = y + visible_height / 2
+        radius_x = max(1.0, visible_width * 0.72)
+        radius_y = max(1.0, visible_height * 0.72)
+
+        context.save()
+        context.translate(center_x, center_y)
+        context.scale(radius_x, radius_y)
+        glow = cairo.RadialGradient(0.0, 0.0, 0.08, 0.0, 0.0, 1.0)
+        glow.add_color_stop_rgba(0.0, 0.475, 0.788, 0.545, 0.34)
+        glow.add_color_stop_rgba(0.55, 0.475, 0.788, 0.545, 0.18)
+        glow.add_color_stop_rgba(1.0, 0.475, 0.788, 0.545, 0.0)
+        context.set_source(glow)
+        context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
+        context.fill()
         context.restore()
 
     def visible_bounds(
