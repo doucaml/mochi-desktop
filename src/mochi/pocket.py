@@ -74,7 +74,33 @@ def _normalize_http_url(value: str) -> str:
     scheme = parsed.scheme.lower()
     if scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("Pocket URL must use http or https")
-    return urlunsplit((scheme, parsed.netloc.lower(), parsed.path, parsed.query, parsed.fragment))
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Pocket URL must include a host")
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("Pocket URL has an invalid port") from error
+
+    userinfo, separator, _hostport = parsed.netloc.rpartition("@")
+    normalized_host = hostname.lower()
+    if ":" in normalized_host:
+        normalized_host = f"[{normalized_host}]"
+    normalized_netloc = (
+        (f"{userinfo}@" if separator else "")
+        + normalized_host
+        + (f":{port}" if port is not None else "")
+    )
+    return urlunsplit(
+        (
+            scheme,
+            normalized_netloc,
+            parsed.path,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
 
 
 def make_url_item(
