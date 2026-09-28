@@ -50,6 +50,7 @@ class PocketRowWidgets:
     model: PocketRowModel
     container: Gtk.Widget
     open_button: Gtk.Button
+    folder_button: Gtk.Button | None
     remove_button: Gtk.Button
 
 
@@ -235,6 +236,23 @@ class PocketWindow(Gtk.Window):
         self._clear_error()
         return True
 
+    def open_containing_folder(self, item_id: str) -> bool:
+        item = self._item(item_id)
+        if item is None or item.kind is not PocketItemKind.LOCAL_FILE:
+            return False
+        if not item_is_available(item):
+            self._show_error("That item is no longer available.")
+            return False
+
+        folder_uri = Path(item.value).parent.as_uri()
+        try:
+            self._launcher(folder_uri)
+        except (GLib.Error, OSError, ValueError) as error:
+            self._show_error(f"Mochi couldn't open that folder: {error}")
+            return False
+        self._clear_error()
+        return True
+
     def remove_item(self, item_id: str) -> bool:
         if not self._controller.remove(item_id):
             self._show_error("Mochi couldn't remove that item.")
@@ -270,11 +288,28 @@ class PocketWindow(Gtk.Window):
         open_button.connect("clicked", lambda _button: self.open_item(item.id))
         row.append(open_button)
 
+        folder_button: Gtk.Button | None = None
+        if item.kind is PocketItemKind.LOCAL_FILE:
+            folder_button = Gtk.Button.new_from_icon_name("folder-open-symbolic")
+            folder_button.set_tooltip_text("Open containing folder")
+            folder_button.set_sensitive(model.available)
+            folder_button.connect(
+                "clicked",
+                lambda _button: self.open_containing_folder(item.id),
+            )
+            row.append(folder_button)
+
         remove_button = Gtk.Button.new_from_icon_name("user-trash-symbolic")
         remove_button.set_tooltip_text("Remove from Pocket")
         remove_button.connect("clicked", lambda _button: self.remove_item(item.id))
         row.append(remove_button)
-        return PocketRowWidgets(model, row, open_button, remove_button)
+        return PocketRowWidgets(
+            model,
+            row,
+            open_button,
+            folder_button,
+            remove_button,
+        )
 
     def _item(self, item_id: str) -> PocketItem | None:
         return next(
