@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock
 
+from gi.repository import Gtk
+
 from mochi.pocket import (
     make_local_file_item,
     make_text_item,
@@ -17,6 +19,8 @@ class _Controller:
     def __init__(self, items=()) -> None:
         self._items = tuple(items)
         self.removed = []
+        self.clear_calls = 0
+        self.clear_succeeds = True
 
     @property
     def items(self):
@@ -25,6 +29,13 @@ class _Controller:
     def remove(self, item_id: str) -> bool:
         self.removed.append(item_id)
         self._items = tuple(item for item in self._items if item.id != item_id)
+        return True
+
+    def clear_all(self) -> bool:
+        self.clear_calls += 1
+        if not self.clear_succeeds:
+            return False
+        self._items = ()
         return True
 
 
@@ -153,3 +164,78 @@ def test_launch_failure_preserves_item_and_shows_feedback() -> None:
     assert controller.items == (item,)
     assert controller.removed == []
     assert "couldn't open" in window.error_text.lower()
+
+
+
+def test_clear_all_button_is_disabled_when_pocket_is_empty() -> None:
+    window = PocketWindow(_Controller())
+
+    assert window.clear_button.get_sensitive() is False
+
+
+def test_clear_all_requires_confirmation_then_refreshes_to_empty() -> None:
+    controller = _Controller((make_text_item("one"), make_text_item("two")))
+    window = PocketWindow(controller)
+
+    assert window.clear_button.get_sensitive() is True
+    window.clear_button.emit("clicked")
+
+    dialog = window.clear_dialog
+    assert dialog is not None
+    assert controller.clear_calls == 0
+
+    dialog.response(Gtk.ResponseType.ACCEPT)
+
+    assert controller.clear_calls == 1
+    assert window.clear_dialog is None
+    assert window.rows == {}
+    assert window.empty_visible is True
+    assert window.clear_button.get_sensitive() is False
+
+
+def test_clear_all_cancel_preserves_items() -> None:
+    item = make_text_item("keep")
+    controller = _Controller((item,))
+    window = PocketWindow(controller)
+
+    window.clear_button.emit("clicked")
+    dialog = window.clear_dialog
+    assert dialog is not None
+
+    dialog.response(Gtk.ResponseType.CANCEL)
+
+    assert controller.clear_calls == 0
+    assert tuple(window.rows) == (item.id,)
+    assert window.clear_dialog is None
+
+
+def test_clear_all_failure_preserves_rows_and_shows_error() -> None:
+    item = make_text_item("keep")
+    controller = _Controller((item,))
+    controller.clear_succeeds = False
+    window = PocketWindow(controller)
+
+    window.clear_button.emit("clicked")
+    dialog = window.clear_dialog
+    assert dialog is not None
+    dialog.response(Gtk.ResponseType.ACCEPT)
+
+    assert controller.clear_calls == 1
+    assert tuple(window.rows) == (item.id,)
+    assert "couldn't clear" in window.error_text.lower()
+
+
+def test_clear_all_closes_owned_text_detail_windows() -> None:
+    item = make_text_item("detail")
+    controller = _Controller((item,))
+    window = PocketWindow(controller)
+    detail = Mock()
+    window.detail_windows.append(detail)
+
+    window.clear_button.emit("clicked")
+    dialog = window.clear_dialog
+    assert dialog is not None
+    dialog.response(Gtk.ResponseType.ACCEPT)
+
+    detail.destroy.assert_called_once_with()
+    assert window.detail_windows == []
