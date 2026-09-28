@@ -73,6 +73,12 @@ through the time you naturally spend together.
 -  **Desktop behavior has been hardened** — recent fixes improve workspace
   stickiness, focus handling, and installer rollback safety during updates.
 
+## Changelog
+
+The highlights above are only a snapshot of recent work. For the full release
+history — including **Unreleased** changes, fixes, compatibility notes, and
+earlier alpha releases — see the **[full changelog →](CHANGELOG.md)**.
+
 ---
 
 
