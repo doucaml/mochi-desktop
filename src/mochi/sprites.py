@@ -190,10 +190,8 @@ class SpriteAtlas:
         center_x = x + visible_width / 2
         center_y = y + visible_height / 2
 
-        # Keep the aura comfortably inside the transparent Buddy canvas.
-        # The previous pulse could reach the DrawingArea boundary, where GTK
-        # clipped it into a visible square. Leave real transparent padding and
-        # make the gradient itself reach zero opacity before its geometric edge.
+        # Keep the aura comfortably inside the transparent Buddy canvas so
+        # GTK never clips a visible pixel into a square edge.
         edge_margin = 10.0
         max_radius_x = max(
             1.0,
@@ -204,13 +202,19 @@ class SpriteAtlas:
             min(center_y, height - center_y) - edge_margin,
         )
 
-        # Animate mostly through luminance. Radius only grows by about six
-        # percent across the pulse so the effect breathes instead of balloons.
-        desired_radius_x = visible_width * (0.60 + 0.04 * pulse)
-        desired_radius_y = visible_height * (0.60 + 0.04 * pulse)
+        # The halo must extend beyond Mochi's opaque body. Base the radius on
+        # half the visible sprite size plus a small exterior halo, rather than
+        # shrinking the whole gradient inside the sprite bounds.
+        half_width = visible_width / 2
+        half_height = visible_height / 2
+        halo_x = min(10.0, max(5.0, visible_width * 0.11))
+        halo_y = min(10.0, max(5.0, visible_height * 0.11))
+        pulse_scale = 0.88 + 0.12 * pulse
+        desired_radius_x = half_width + halo_x * pulse_scale
+        desired_radius_y = half_height + halo_y * pulse_scale
         radius_x = min(max_radius_x, max(1.0, desired_radius_x))
         radius_y = min(max_radius_y, max(1.0, desired_radius_y))
-        outer_alpha = 0.18 + 0.08 * pulse
+        outer_alpha = 0.22 + 0.10 * pulse
         inner_alpha = 0.23 + 0.10 * pulse
 
         context.save()
@@ -220,13 +224,19 @@ class SpriteAtlas:
         outer = cairo.RadialGradient(0.0, 0.0, 0.06, 0.0, 0.0, 1.0)
         outer.add_color_stop_rgba(0.0, 0.475, 0.788, 0.545, outer_alpha)
         outer.add_color_stop_rgba(
-            0.50,
+            0.55,
             0.475,
             0.788,
             0.545,
-            outer_alpha * 0.45,
+            outer_alpha * 0.62,
         )
-        outer.add_color_stop_rgba(0.78, 0.475, 0.788, 0.545, 0.0)
+        outer.add_color_stop_rgba(
+            0.84,
+            0.475,
+            0.788,
+            0.545,
+            outer_alpha * 0.24,
+        )
         outer.add_color_stop_rgba(1.0, 0.475, 0.788, 0.545, 0.0)
         context.set_source(outer)
         context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
@@ -236,13 +246,12 @@ class SpriteAtlas:
         inner = cairo.RadialGradient(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
         inner.add_color_stop_rgba(0.0, 0.56, 0.88, 0.63, inner_alpha)
         inner.add_color_stop_rgba(
-            0.58,
+            0.62,
             0.56,
             0.88,
             0.63,
-            inner_alpha * 0.28,
+            inner_alpha * 0.30,
         )
-        inner.add_color_stop_rgba(0.82, 0.56, 0.88, 0.63, 0.0)
         inner.add_color_stop_rgba(1.0, 0.56, 0.88, 0.63, 0.0)
         context.set_source(inner)
         context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
