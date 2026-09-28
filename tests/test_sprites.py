@@ -131,6 +131,29 @@ class SpriteDefinitionsTests(unittest.TestCase):
             sum(bytes(low.get_data())),
         )
 
+
+    def test_pocket_glow_is_fully_transparent_before_small_widget_edges(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        size = 112
+        margin = 8
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+
+        atlas.draw_glow(cairo.Context(surface), frame, size, size, pulse=1.0)
+        surface.flush()
+
+        data = bytes(surface.get_data())
+        stride = surface.get_stride()
+        self.assertTrue(any(data))
+
+        for y in range(size):
+            row = data[y * stride : (y + 1) * stride]
+            if y < margin or y >= size - margin:
+                self.assertFalse(any(row))
+                continue
+            self.assertFalse(any(row[: margin * 4]))
+            self.assertFalse(any(row[(size - margin) * 4 : size * 4]))
+
     def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
         with (project_root / "pyproject.toml").open("rb") as stream:
