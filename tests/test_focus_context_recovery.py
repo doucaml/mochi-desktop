@@ -13,7 +13,7 @@ from mochi.state import MochiState, StateMachine
 
 
 def _focused_buddy(buddy_type, *, category: str):
-    buddy = object.__new__(buddy_type)
+    buddy = buddy_type.__new__(buddy_type)
     buddy.state = StateMachine()
     buddy.state.current = MochiState.COMPUTER
 
