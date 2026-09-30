@@ -724,7 +724,10 @@ class PresenceBuddyMixin:
             self._vscode_coworking_active = True
             return GLib.SOURCE_REMOVE
 
-        if self._start_typing_emote():
+        if (
+            self._start_typing_emote()
+            and self.state.current is MochiState.TYPING
+        ):
             self._vscode_coworking_active = True
             self._logger.debug("VS Code coworking mode started")
         return GLib.SOURCE_REMOVE

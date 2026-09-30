@@ -118,7 +118,10 @@ class TerminalCoworkMixin:
 
         # Reuse the proven TYPING state for lifecycle/interruptions. The normal
         # typing intro is immediately replaced with terminal-specific artwork.
-        if self._start_typing_emote():
+        if (
+            self._start_typing_emote()
+            and self.state.current is MochiState.TYPING
+        ):
             self._terminal_coworking_active = True
             self._play_terminal_intro()
             self._logger.debug("Terminal coworking mode started")
