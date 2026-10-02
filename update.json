@@ -2,8 +2,8 @@
   "version": "0.4.0a1",
   "channel": "main",
   "highlights": [
-    "Drag files, folders, links, text, and images onto Mochi with the new Pocket.",
-    "Mochi can now update himself through a safer staged restart and rollback flow.",
-    "The canonical Mochi Artist Kit is open for community-made animations."
+    "Update & Restart now brings Mochi back after installing instead of leaving him closed.",
+    "If an update fails, Show Details now explains what went wrong.",
+    "Drag files, folders, links, text, and images onto Mochi with the new Pocket."
   ]
 }
