@@ -8,16 +8,19 @@ from pathlib import Path
 import shutil
 import subprocess
 import tarfile
+import sys
 import threading
 import time
 
 from mochi.update.model import InstalledBuild, UpdateMetadata, UpdateTarget
 from mochi.update.storage import InstallMetadataStore
 from mochi.update.worker import (
+    CANDIDATE_CHECK_SOURCE,
     READY_TIMEOUT_SECONDS,
     UpdatePaths,
     UpdateStage,
     UpdateWorker,
+    child_environment,
 )
 
 
@@ -63,12 +66,15 @@ class _Harness:
         stage_returncode: int = 0,
         refresh_returncode: int = 0,
         ready: bool = True,
+        validation_returncode: int = 0,
     ) -> None:
         self.archive = tmp_path / "source.tar.gz"
         _make_source_archive(self.archive)
         self.stage_returncode = stage_returncode
         self.refresh_returncode = refresh_returncode
         self.ready = ready
+        self.validation_returncode = validation_returncode
+        self.child_environments: list[tuple[str, dict[str, str] | None]] = []
         self.download_urls: list[str] = []
         self.commands: list[tuple[str, ...]] = []
         self.launches: list[tuple[str, ...]] = []
@@ -85,6 +91,7 @@ class _Harness:
     def run_command(self, args, *, cwd=None, env=None):
         argv = tuple(str(value) for value in args)
         self.commands.append(argv)
+        self.child_environments.append((argv[0], env))
 
         if "--stage-runtime" in argv:
             self.lifecycle.append("stage")
@@ -103,20 +110,34 @@ class _Harness:
                 )
                 (target / "share" / "mochi" / "master" / "mochi_default.png").touch()
             return subprocess.CompletedProcess(
-                list(argv), self.stage_returncode, stdout="", stderr=""
+                list(argv),
+                self.stage_returncode,
+                stdout="Installing Mochi\n",
+                stderr="" if self.stage_returncode == 0 else "pip: build failed\n",
             )
 
         if "--refresh-integrations" in argv:
             return subprocess.CompletedProcess(
-                list(argv), self.refresh_returncode, stdout="", stderr=""
+                list(argv),
+                self.refresh_returncode,
+                stdout="",
+                stderr="" if self.refresh_returncode == 0 else "icon cache failed\n",
             )
 
         # Candidate validation commands.
+        if self.validation_returncode != 0:
+            return subprocess.CompletedProcess(
+                list(argv),
+                self.validation_returncode,
+                stdout="",
+                stderr="ModuleNotFoundError: No module named 'mochi.main'\n",
+            )
         return subprocess.CompletedProcess(list(argv), 0, stdout="0.4.0a1\n", stderr="")
 
     def launch(self, args, *, env=None):
         argv = tuple(str(value) for value in args)
         self.launches.append(argv)
+        self.child_environments.append((argv[0], env))
         return object()
 
     def wait_for_pid(self, pid: int) -> None:
@@ -374,3 +395,172 @@ def test_worker_never_promotes_a_built_virtualenv_by_renaming_it(
     )
     assert str(paths.final_venv) in stage_command
     assert str(paths.update_venv) not in stage_command
+
+
+def _bootstrap_environment(monkeypatch, tmp_path: Path) -> Path:
+    """Reproduce the environment the 0.4.0a1 bootstrap gave the worker."""
+    workspace = tmp_path / "update-bootstrap" / "update-abc"
+    monkeypatch.setenv("PYTHONPATH", str(workspace))
+    monkeypatch.setenv("MOCHI_UPDATER_WORKSPACE", str(workspace))
+    monkeypatch.setenv("MOCHI_UPDATER_ASSET_ROOT", str(workspace / "assets" / "mochi"))
+    monkeypatch.setenv("MOCHI_UNRELATED_SETTING", "kept")
+    return workspace
+
+
+def _assert_clean_child_environment(env: dict[str, str] | None) -> None:
+    assert env is not None, "children must get an explicit, sanitized environment"
+    assert "PYTHONPATH" not in env
+    assert not [key for key in env if key.startswith("MOCHI_UPDATER_")]
+    assert env["MOCHI_UNRELATED_SETTING"] == "kept"
+
+
+def test_every_child_process_gets_an_environment_without_updater_paths(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _bootstrap_environment(monkeypatch, tmp_path)
+    paths = _paths(tmp_path)
+    harness = _Harness(tmp_path)
+    worker, _store = _worker(tmp_path, harness, paths)
+
+    assert worker.run(_target("good-sha"), wait_pid=None, on_progress=lambda _p: None) == 0
+
+    executables = [Path(name).name for name, _env in harness.child_environments]
+    assert executables.count("install.sh") == 2
+    assert "python" in executables
+    assert "mochi" in executables
+    for _name, env in harness.child_environments:
+        _assert_clean_child_environment(env)
+    installer_envs = [
+        env for name, env in harness.child_environments if name.endswith("install.sh")
+    ]
+    assert all(env["MOCHI_INSTALLED_COMMIT"] == "good-sha" for env in installer_envs)
+
+
+def test_rollback_relaunch_also_gets_a_clean_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _bootstrap_environment(monkeypatch, tmp_path)
+    paths = _paths(tmp_path)
+    harness = _Harness(tmp_path, ready=False)
+    worker, _store = _worker(tmp_path, harness, paths)
+
+    assert worker.run(_target(), wait_pid=None, on_progress=lambda _p: None) != 0
+
+    assert len(harness.launches) == 2
+    launch_envs = [
+        env for name, env in harness.child_environments if name.endswith("/bin/mochi")
+    ]
+    assert len(launch_envs) == 2
+    for env in launch_envs:
+        _assert_clean_child_environment(env)
+
+
+def test_child_environment_drops_any_pythonpath_and_updater_variables() -> None:
+    environment = child_environment(
+        {
+            "PATH": "/usr/bin",
+            "PYTHONPATH": "/home/me/dev/src",
+            "MOCHI_UPDATER_ASSET_ROOT": "/tmp/assets",
+            "MOCHI_INSTALLED_COMMIT": "abc",
+        }
+    )
+
+    assert environment == {"PATH": "/usr/bin", "MOCHI_INSTALLED_COMMIT": "abc"}
+
+
+def _failure_messages(events: list) -> list[str]:
+    return [event.message for event in events if event.stage is UpdateStage.FAILED]
+
+
+def test_stage_failure_reports_installer_output(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    harness = _Harness(tmp_path, stage_returncode=42)
+    worker, _store = _worker(tmp_path, harness, paths)
+    events: list = []
+
+    assert worker.run(_target(), wait_pid=None, on_progress=events.append) == 42
+
+    [message] = _failure_messages(events)
+    assert "previous version was restored" in message
+    assert "pip: build failed" in message
+    assert "Installing Mochi" in message
+
+
+def test_refresh_failure_reports_installer_output(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    harness = _Harness(tmp_path, refresh_returncode=9)
+    worker, _store = _worker(tmp_path, harness, paths)
+    events: list = []
+
+    assert worker.run(_target(), wait_pid=None, on_progress=events.append) == 9
+
+    [message] = _failure_messages(events)
+    assert "desktop integration" in message
+    assert "icon cache failed" in message
+
+
+def test_readiness_timeout_reports_failure_instead_of_exiting_silently(
+    tmp_path: Path,
+) -> None:
+    paths = _paths(tmp_path)
+    harness = _Harness(tmp_path, ready=False)
+    worker, _store = _worker(tmp_path, harness, paths)
+    events: list = []
+
+    assert worker.run(_target(), wait_pid=None, on_progress=events.append) == 1
+
+    [message] = _failure_messages(events)
+    assert "didn't start" in message
+    assert "previous version was restored" in message
+
+
+def test_candidate_check_failure_rolls_back_and_reports_why(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    harness = _Harness(tmp_path, validation_returncode=1)
+    worker, store = _worker(tmp_path, harness, paths)
+    events: list = []
+
+    assert worker.run(_target(), wait_pid=None, on_progress=events.append) != 0
+
+    [message] = _failure_messages(events)
+    assert "startup check" in message
+    assert "No module named 'mochi.main'" in message
+    assert (paths.final_venv / "old.marker").read_text(encoding="utf-8") == "old"
+    assert harness.launches[-1][0].endswith("/venv/bin/mochi")
+    assert store.load() is None
+
+
+def _run_candidate_check(pythonpath: str) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = pythonpath
+    return subprocess.run(
+        [sys.executable, "-c", CANDIDATE_CHECK_SOURCE],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def test_candidate_check_rejects_the_updater_stub_package(tmp_path: Path) -> None:
+    stub = tmp_path / "workspace"
+    (stub / "mochi" / "update").mkdir(parents=True)
+    (stub / "mochi" / "__init__.py").write_text("", encoding="utf-8")
+    (stub / "mochi" / "update" / "__init__.py").write_text("", encoding="utf-8")
+
+    completed = _run_candidate_check(str(stub))
+
+    # The 0.4.0a1 check ran only ``import mochi`` and passed on this stub.
+    assert completed.returncode != 0
+    assert "mochi.main" in completed.stderr
+
+
+def test_candidate_check_rejects_mochi_imported_from_outside_the_runtime() -> None:
+    source_tree = Path(__file__).resolve().parents[1] / "src"
+
+    completed = _run_candidate_check(str(source_tree))
+
+    assert completed.returncode != 0
+    assert "outside the candidate runtime" in completed.stderr

@@ -22,6 +22,58 @@ from .storage import InstallMetadataStore
 
 READY_TIMEOUT_SECONDS = 10.0
 PID_WAIT_TIMEOUT_SECONDS = 30.0
+FAILURE_DETAILS_LIMIT = 4000
+UPDATER_ENVIRONMENT_PREFIX = "MOCHI_UPDATER_"
+
+# Run inside the candidate runtime. Importing mochi.main (not just the package)
+# proves the real package resolved; the location check proves it resolved from
+# the candidate virtualenv rather than from anything left on the import path.
+CANDIDATE_CHECK_SOURCE = """\
+from importlib import metadata
+from pathlib import Path
+import sys
+
+import mochi.main
+
+location = Path(mochi.main.__file__).resolve()
+prefix = Path(sys.prefix).resolve()
+if prefix not in location.parents:
+    sys.exit(f"mochi was imported from outside the candidate runtime: {location}")
+print(metadata.version("mochi-desktop"))
+"""
+
+
+def child_environment(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Return the environment for install.sh, validation, and relaunched Mochi.
+
+    The installed runtime must import only from its own virtualenv, so
+    PYTHONPATH is never inherited. In 0.4.0a1 it pointed at the updater's
+    bootstrap workspace, whose stub ``mochi`` package shadowed the real one and
+    crashed every relaunch. The updater's private variables name a temporary
+    directory that is deleted when the updater exits.
+    """
+    environment = dict(os.environ if base is None else base)
+    environment.pop("PYTHONPATH", None)
+    for name in [key for key in environment if key.startswith(UPDATER_ENVIRONMENT_PREFIX)]:
+        del environment[name]
+    return environment
+
+
+def _failure_details(summary: str, result: object | None = None) -> str:
+    """Combine a short explanation with the tail of a command's output."""
+    output = "\n".join(
+        text.strip()
+        for text in (
+            str(getattr(result, "stdout", "") or ""),
+            str(getattr(result, "stderr", "") or ""),
+        )
+        if text.strip()
+    )
+    if not output:
+        return summary
+    if len(output) > FAILURE_DETAILS_LIMIT:
+        output = "…" + output[-FAILURE_DETAILS_LIMIT:]
+    return f"{summary}\n\n{output}"
 
 
 class _UpdateCancelled(Exception):
@@ -233,7 +285,7 @@ class UpdateWorker:
             swapped = True
 
             on_progress(UpdateProgress(UpdateStage.INSTALLING, "Installing Mochi…"))
-            env = os.environ.copy()
+            env = child_environment()
             env["MOCHI_INSTALLED_COMMIT"] = target.commit
             stage = self._run_command(
                 [
@@ -248,6 +300,16 @@ class UpdateWorker:
                 failure_code = int(getattr(stage, "returncode", 1) or 1)
                 self._rollback_and_relaunch()
                 swapped = False
+                on_progress(
+                    UpdateProgress(
+                        UpdateStage.FAILED,
+                        _failure_details(
+                            "Mochi's installer couldn't build the new version, "
+                            "so the previous version was restored.",
+                            stage,
+                        ),
+                    )
+                )
                 return failure_code
 
             installed_version = self._validate_candidate()
@@ -264,6 +326,16 @@ class UpdateWorker:
                 failure_code = int(getattr(refresh, "returncode", 1) or 1)
                 self._rollback_and_relaunch()
                 swapped = False
+                on_progress(
+                    UpdateProgress(
+                        UpdateStage.FAILED,
+                        _failure_details(
+                            "Mochi's desktop integration couldn't be refreshed, "
+                            "so the previous version was restored.",
+                            refresh,
+                        ),
+                    )
+                )
                 return failure_code
 
             self.paths.ready_file.unlink(missing_ok=True)
@@ -274,12 +346,21 @@ class UpdateWorker:
                     "--update-ready-file",
                     self.paths.ready_file,
                 ],
-                env=os.environ.copy(),
+                env=child_environment(),
             )
 
             if not self._wait_for_ready(self.paths.ready_file, READY_TIMEOUT_SECONDS):
                 self._rollback_and_relaunch()
                 swapped = False
+                on_progress(
+                    UpdateProgress(
+                        UpdateStage.FAILED,
+                        "The new Mochi didn't start within "
+                        f"{READY_TIMEOUT_SECONDS:g} seconds, so the previous "
+                        "version was restored. Running `mochi` from a terminal "
+                        "shows why it couldn't start.",
+                    )
+                )
                 return 1
 
             self._install_store.save(
@@ -378,20 +459,14 @@ class UpdateWorker:
                 raise RuntimeError(f"candidate runtime asset is missing: {asset}")
 
         result = self._run_command(
-            [
-                python,
-                "-c",
-                (
-                    "from importlib import metadata; "
-                    "import mochi; "
-                    "print(metadata.version('mochi-desktop'))"
-                ),
-            ],
+            [python, "-c", CANDIDATE_CHECK_SOURCE],
             cwd=None,
-            env=os.environ.copy(),
+            env=child_environment(),
         )
         if getattr(result, "returncode", 1) != 0:
-            raise RuntimeError("candidate Mochi import/version check failed")
+            raise RuntimeError(
+                _failure_details("The new Mochi failed its startup check.", result)
+            )
         version = str(getattr(result, "stdout", "")).strip().splitlines()
         if not version or not version[-1].strip():
             raise RuntimeError("candidate Mochi version is unavailable")
@@ -405,5 +480,5 @@ class UpdateWorker:
         self.paths.backup_venv.rename(self.paths.final_venv)
         self._launch_command(
             [self.paths.final_venv / "bin" / "mochi"],
-            env=os.environ.copy(),
+            env=child_environment(),
         )
