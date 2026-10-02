@@ -54,13 +54,19 @@ def _runner_source() -> str:
 import json
 from pathlib import Path
 import shutil
+import sys
+
+# Import the copied updater from this workspace without exporting PYTHONPATH:
+# an exported path is inherited by install.sh and the relaunched Mochi, where
+# this stub package would shadow the real one.
+workspace = Path(__file__).resolve().parent
+sys.path.insert(0, str(workspace))
 
 from mochi.update.external import run_external_update
 from mochi.update.model import UpdateMetadata, UpdateTarget
 from mochi.update.worker import UpdateWorker
 
 
-workspace = Path(__file__).resolve().parent
 request_path = workspace / "request.json"
 request = json.loads(request_path.read_text(encoding="utf-8"))
 target = UpdateTarget(
@@ -159,9 +165,10 @@ def bootstrap_updater(
         runner.write_text(_runner_source(), encoding="utf-8")
 
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(workspace)
+        # The runner adds its own workspace to sys.path. Never export it (or an
+        # inherited PYTHONPATH) to the updater's children; see worker.child_environment.
+        env.pop("PYTHONPATH", None)
         env["MOCHI_UPDATER_ASSET_ROOT"] = str(copied_asset_root)
-        env["MOCHI_UPDATER_WORKSPACE"] = str(workspace)
 
         return popen(
             [str(selected_python), str(runner)],

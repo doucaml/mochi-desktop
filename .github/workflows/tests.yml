@@ -30,11 +30,15 @@ jobs:
             gir1.2-gtk-4.0 \
             gsettings-desktop-schemas \
             libx11-6 \
+            dbus \
             xvfb
 
       - name: Run test suite
         env:
           PYTHONPATH: src
+          # Real install → update → relaunch, including from the released
+          # 0.4.0a1 updater (needs the full history fetched above).
+          MOCHI_RUN_UPDATE_E2E: "1"
         run: xvfb-run -a python3 -m pytest -q
 
 
@@ -84,6 +88,7 @@ jobs:
                   raise SystemExit(f"wheel is missing required runtime content: {suffix}")
 
           required_modules = (
+              "mochi_launcher.py",
               "mochi/update/checker.py",
               "mochi/update/worker.py",
               "mochi/update/window.py",
@@ -93,4 +98,13 @@ jobs:
           for module in required_modules:
               if module not in names:
                   raise SystemExit(f"wheel is missing updater module: {module}")
+
+          with zipfile.ZipFile(wheels[0]) as archive:
+              entry_points = next(
+                  archive.read(name).decode()
+                  for name in names
+                  if name.endswith(".dist-info/entry_points.txt")
+              )
+          if "mochi = mochi_launcher:main" not in entry_points:
+              raise SystemExit("mochi console script must use mochi_launcher:main")
           PY

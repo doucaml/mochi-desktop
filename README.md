@@ -304,10 +304,17 @@ mochi-update
 
 The current alpha update channel follows the latest commit on `main`. One
 update attempt is pinned to the exact commit Mochi found, downloads a clean
-archive of that commit, prepares the replacement runtime beside the current
-one, and only swaps after the candidate passes validation. The previous runtime
-is kept until the updated Mochi starts successfully, so a failed update can
-restore the working installation.
+archive of that commit, moves the current runtime aside as a backup, builds the
+replacement in its place, and checks that it loads correctly. The backup is
+kept until the updated Mochi starts successfully. If the new build fails or
+does not start, the backup is restored and relaunched, and **Show Details** in
+the update window explains what went wrong.
+
+> **If an earlier update left Mochi closed:** the 0.4.0-alpha.1 updater could
+> install a new build and then fail to relaunch Mochi. Your previous
+> installation was restored and your bond and Pocket are untouched. Open Mochi
+> again from your app grid (or run `mochi`), then update again; current builds
+> relaunch correctly even when started by the older updater.
 
 Bond progress, unlocks, preferences, and other user state are stored separately
 from the replaceable runtime and are not reset by an ordinary update.

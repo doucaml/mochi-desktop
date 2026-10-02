@@ -6,7 +6,21 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 
 ## Unreleased
 
-No unreleased user-facing changes yet.
+### Fixed
+
+- **Update & Restart** now relaunches Mochi after installing. In 0.4.0-alpha.1
+  the updater leaked its private `PYTHONPATH` into the relaunched Mochi, which
+  then crashed on startup; the rollback restored the previous installation but
+  crashed the same way, leaving Mochi closed. The updater now gives install,
+  validation, and relaunch a clean environment, and the `mochi` command starts
+  through a small launcher that also survives the older updater's environment,
+  so installations still running 0.4.0-alpha.1 can update to this fix.
+  If an earlier update left Mochi closed, open Mochi again and update again.
+- The updater's candidate check now confirms the real Mochi package loads from
+  the new runtime instead of only checking that a `mochi` package exists.
+- Failed updates now say what went wrong: installer, integration-refresh,
+  startup-check, and relaunch failures each report a reason, and installer
+  output appears under **Show Details** instead of only an exit status.
 
 ## 0.4.0-alpha.1 — Pocket & Polish
 

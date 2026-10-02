@@ -96,7 +96,11 @@ def test_bootstrap_copies_update_package_and_selected_art_before_launch(
     command, env = calls[0]
     assert command[0] == "/usr/bin/python3"
     assert command[1] == str(workspace / "runner.py")
-    assert env["PYTHONPATH"] == str(workspace)
+    assert env["MOCHI_UPDATER_ASSET_ROOT"] == str(workspace / "assets" / "mochi")
+    # An exported PYTHONPATH reaches install.sh and the relaunched Mochi, where
+    # the workspace's stub ``mochi`` package shadows the real one (0.4.0a1).
+    assert "PYTHONPATH" not in env
+    assert "MOCHI_UPDATER_WORKSPACE" not in env
 
     # The copied worker remains available even if the original package vanishes.
     renamed = source_package.with_name("update.removed")
@@ -208,16 +212,18 @@ def test_real_bootstrap_package_imports_without_rest_of_mochi(tmp_path: Path) ->
     )
 
     workspace = next((app_home / "update-bootstrap").iterdir())
+    runner_source = (workspace / "runner.py").read_text(encoding="utf-8")
+    import_prelude = runner_source.split("request_path =", 1)[0]
+    probe = workspace / "probe.py"
+    probe.write_text(import_prelude + "print('ok')\n", encoding="utf-8")
     environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(workspace)
+    environment.pop("PYTHONPATH", None)
 
+    # Run the runner's own import prelude the way bootstrap launches it: no
+    # PYTHONPATH and an unrelated working directory.
     completed = subprocess.run(
-        [
-            sys._base_executable or sys.executable,
-            "-c",
-            "from mochi.update.external import run_external_update; print('ok')",
-        ],
-        cwd=workspace,
+        [sys._base_executable or sys.executable, str(probe)],
+        cwd=tmp_path,
         env=environment,
         text=True,
         capture_output=True,

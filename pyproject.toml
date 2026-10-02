@@ -13,11 +13,13 @@ authors = [{ name = "Mochi contributors" }]
 dependencies = []
 
 [project.scripts]
-mochi = "mochi.main:main"
+mochi = "mochi_launcher:main"
 mochi-update = "mochi.update_cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
+# Top-level so a stale updater workspace cannot shadow the entry point.
+py-modules = ["mochi_launcher"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
