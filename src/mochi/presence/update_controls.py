@@ -165,11 +165,29 @@ class UpdateControlsMixin:
         else:
             self._handle_update_menu_action()
 
+    def _current_update_target(self) -> UpdateTarget | None:
+        """Return the known target only if it came from the channel now saved.
+
+        ``mochi-update --channel`` runs in another process, so a target found
+        on the previous channel can still be held here; drop it instead of
+        offering or installing it.
+        """
+        target = self._update_target
+        if target is None:
+            return None
+        if target.metadata.channel != self._config.load_update_channel():
+            self._update_target = None
+            if self._update_menu_label is not None:
+                self._update_menu_label.set_text("Check for updates")
+            return None
+        return target
+
     def _handle_update_menu_action(self) -> None:
-        if self._update_target is None:
+        target = self._current_update_target()
+        if target is None:
             self._start_update_check(manual=True)
             return
-        self._show_update_window(self._update_target)
+        self._show_update_window(target)
 
     def _get_update_window(self) -> UpdateWindow:
         if self._update_window is None:
@@ -214,8 +232,12 @@ class UpdateControlsMixin:
             self._update_window = None
 
     def _begin_update_restart(self) -> None:
-        target = self._update_target
+        if self._update_target is None:
+            return
+        target = self._current_update_target()
         if target is None:
+            # The channel changed while the update window was open.
+            self._start_update_check(manual=True)
             return
 
         bootstrap_updater(

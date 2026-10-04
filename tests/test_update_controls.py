@@ -31,6 +31,10 @@ def _target(commit: str = "new-sha") -> UpdateTarget:
 class _Config:
     def __init__(self) -> None:
         self.dismissed: str | None = None
+        self.channel = "main"
+
+    def load_update_channel(self) -> str:
+        return self.channel
 
     def save_dismissed_update_commit(self, commit: str | None) -> None:
         self.dismissed = commit
@@ -206,6 +210,42 @@ def test_update_restart_bootstraps_exact_target_then_quits_application(monkeypat
 
     bootstrap.assert_called_once_with(target, gui=True, wait_pid=os.getpid())
     application.quit.assert_called_once()
+
+
+def test_menu_action_drops_a_target_found_on_another_channel() -> None:
+    # The target was found on main, then `mochi-update --channel release` ran
+    # in another process while Mochi kept the stale target in memory.
+    buddy = _Harness()
+    buddy._build_context_menu()
+    buddy._update_target = _target()
+    buddy._config.channel = "release"
+
+    buddy._handle_update_menu_action()
+
+    assert buddy.opened_targets == []
+    assert buddy._update_target is None
+    assert buddy.manual_checks == [True]
+    buddy._made_label.set_text.assert_called_with("Check for updates")
+
+
+def test_update_restart_refuses_a_target_from_another_channel(monkeypatch) -> None:
+    buddy = _Harness()
+    buddy._update_target = _target()
+    buddy._config.channel = "release"
+    bootstrap = Mock()
+    application = Mock()
+    monkeypatch.setattr("mochi.presence.update_controls.bootstrap_updater", bootstrap)
+    monkeypatch.setattr(
+        "mochi.presence.update_controls.Gtk.Application.get_default",
+        lambda: application,
+    )
+
+    buddy._begin_update_restart()
+
+    bootstrap.assert_not_called()
+    application.quit.assert_not_called()
+    assert buddy._update_target is None
+    assert buddy.manual_checks == [True]
 
 
 def test_shutdown_invalidates_update_callbacks_and_destroys_window() -> None:
