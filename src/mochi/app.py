@@ -10,6 +10,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, Gtk  # noqa: E402
 
+from mochi.appearance import SystemColorSchemeSync
 from mochi.config import ConfigStore
 from mochi.presence.click_dialogue import PresenceBuddy, PresenceX11Buddy
 from mochi.sound import SoundEvent, SoundManager
@@ -45,6 +46,7 @@ class MochiApplication(Gtk.Application):
         self.update_ready_file = update_ready_file
         self._logger = logging.getLogger(__name__)
         self._buddy: PresenceBuddy | PresenceX11Buddy | None = None
+        self._color_scheme_sync: SystemColorSchemeSync | None = None
         self.sound = SoundManager(
             volume=config.load_volume(),
             muted=config.load_muted(),
@@ -55,6 +57,10 @@ class MochiApplication(Gtk.Application):
         if existing is not None:
             existing.present()
             return
+
+        # Plain GTK does not track the desktop's light/dark switch on its own.
+        self._color_scheme_sync = SystemColorSchemeSync(Gtk.Settings.get_default())
+        self._color_scheme_sync.start()
 
         window = Gtk.ApplicationWindow(application=self)
         window.add_css_class("mochi-buddy-window")

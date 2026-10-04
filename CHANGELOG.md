@@ -8,6 +8,14 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 
 ### Fixed
 
+- Mochi's nameplate, speech bubble, and bond progress overlay are readable in
+  light mode again. They used libadwaita-only theme colors that plain GTK does
+  not define, so GTK dropped them and the nameplate showed white text with no
+  background — invisible on light desktops.
+- Mochi now follows the desktop's light/dark style, including switching live,
+  through the XDG Settings portal. Previously plain GTK 4 (before 4.20) kept
+  Mochi's menus and overlays in one style regardless of the system setting.
+
 - **Update & Restart** now relaunches Mochi after installing. In 0.4.0-alpha.1
   the updater leaked its private `PYTHONPATH` into the relaunched Mochi, which
   then crashed on startup; the rollback restored the previous installation but

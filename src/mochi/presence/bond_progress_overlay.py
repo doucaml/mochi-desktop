@@ -750,8 +750,8 @@ class BondProgressOverlay:
                 background: transparent;
             }
             .mochi-bond-card {
-                background: alpha(@window_bg_color, 0.97);
-                color: @window_fg_color;
+                background: alpha(@theme_bg_color, 0.97);
+                color: @theme_fg_color;
                 border: 1px solid alpha(#79c98b, 0.44);
                 border-radius: 11px;
                 box-shadow: 0 5px 18px alpha(black, 0.16);
@@ -762,7 +762,7 @@ class BondProgressOverlay:
                 box-shadow: 0 4px 16px alpha(#79c98b, 0.18);
             }
             .mochi-bond-card.mochi-bond-level-up {
-                background: alpha(@window_bg_color, 0.98);
+                background: alpha(@theme_bg_color, 0.98);
                 border: 2px solid alpha(#a8f2b4, 0.92);
                 border-radius: 14px;
                 box-shadow: 0 7px 24px alpha(#79c98b, 0.34);
@@ -785,7 +785,7 @@ class BondProgressOverlay:
                 margin-bottom: 2px;
             }
             .mochi-level-up-subtitle {
-                color: alpha(@window_fg_color, 0.68);
+                color: alpha(@theme_fg_color, 0.68);
                 font-size: 9px;
             }
             .mochi-bond-level {
@@ -796,7 +796,7 @@ class BondProgressOverlay:
                 font-weight: 800;
             }
             .mochi-bond-activity {
-                color: alpha(@window_fg_color, 0.62);
+                color: alpha(@theme_fg_color, 0.62);
                 font-size: 9px;
             }
             .mochi-bond-activity.mochi-bond-level-up {
@@ -804,7 +804,7 @@ class BondProgressOverlay:
                 font-weight: 800;
             }
             .mochi-bond-xp {
-                color: alpha(@window_fg_color, 0.62);
+                color: alpha(@theme_fg_color, 0.62);
                 font-size: 9px;
             }
             .mochi-bond-gain-text {
@@ -821,7 +821,7 @@ class BondProgressOverlay:
             progressbar.mochi-bond-progress trough {
                 min-height: 7px;
                 border-radius: 999px;
-                background: alpha(@window_fg_color, 0.12);
+                background: alpha(@theme_fg_color, 0.12);
             }
             progressbar.mochi-bond-progress progress {
                 min-height: 7px;
@@ -841,7 +841,7 @@ class BondProgressOverlay:
                 padding: 0;
             }
             popover.mochi-bond-popover > arrow {
-                background: alpha(@window_bg_color, 0.97);
+                background: alpha(@theme_bg_color, 0.97);
                 border-color: alpha(#79c98b, 0.44);
             }
             """
