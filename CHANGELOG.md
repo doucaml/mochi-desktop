@@ -8,6 +8,9 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 
 ### Changed
 
+- Terminal coworking has new artwork: Mochi takes out a little laptop, types
+  sleepily, and puts it away again when you leave the terminal. The opening and
+  closing frames match his idle pose, so the change in and out does not pop.
 - Installed Mochi now updates from **published GitHub Releases** instead of
   every commit on `main`, so a change has to ship in a release before it
   reaches everyone. Alpha testers can keep following `main` with
