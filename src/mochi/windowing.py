@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 import gi
 
@@ -18,6 +19,7 @@ except (ImportError, ValueError):
 
 from mochi.config import Position
 from mochi.x11 import (
+    disable_frame_sync,
     get_pointer_position,
     get_window_position,
     move_window,
@@ -51,6 +53,10 @@ class WindowPlacement:
         # desktop overlay instead of a regular application window. Deferred to
         # the next idle tick because the GdkSurface is not realized yet.
         GLib.idle_add(self._apply_x11_sticky_properties)
+        if not self.layer_shell_enabled:
+            window.connect("realize", self._configure_x11_frame_sync)
+            if window.get_realized():
+                self._configure_x11_frame_sync(window)
 
     def _enable_layer_shell(self) -> bool:
         display = self.window.get_display()
@@ -81,6 +87,17 @@ class WindowPlacement:
         self.move_to(self.position.x, self.position.y)
         self._logger.info("Using gtk4-layer-shell Wayland overlay")
         return True
+
+    def _configure_x11_frame_sync(self, window: Gtk.Window) -> None:
+        """Keep Mochi repainting even if the compositor drops a frame reply (#45).
+
+        ``MOCHI_X11_FRAME_SYNC=1`` keeps GTK's default, for comparing builds.
+        """
+        if os.environ.get("MOCHI_X11_FRAME_SYNC") == "1":
+            self._logger.info("Keeping GTK's X11 compositor frame sync (MOCHI_X11_FRAME_SYNC=1)")
+            return
+        if disable_frame_sync(window):
+            self._logger.debug("Disabled GTK's X11 compositor frame sync for Mochi")
 
     def _apply_x11_sticky_properties(self) -> bool:
         """Make the XWayland window sticky and non-focus-stealing.
