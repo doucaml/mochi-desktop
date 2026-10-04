@@ -33,6 +33,7 @@ from mochi.file_activity import FileActivityMonitor
 from mochi.media_activity import MediaActivityMonitor
 from mochi.buddy_menu import BuddyMenuController
 from mochi.ambient_activity import AmbientActivityController
+from mochi.lifecycle_watch import LifecycleWatch, motion_budget_ms
 from mochi.interaction_tuning import (
     COMPUTER_IDLE_DELAY_SECONDS,
     DRAG_BODY_SWAY_PX,
@@ -239,6 +240,10 @@ class Buddy(Gtk.DrawingArea):
         self._developer_menu.connect("closed", self._on_developer_menu_closed)
 
         GLib.timeout_add(self.TICK_MS, self._tick)
+        self._lifecycle: LifecycleWatch | None = None
+        self._lifecycle_check_source_id: int | None = None
+        if self._logger.isEnabledFor(logging.DEBUG):
+            self._start_lifecycle_watch()
         if not self._preview_mode:
             self._typing_monitor = TypingActivityMonitor(
                 on_typing_activity=self._on_typing_activity,
@@ -1114,6 +1119,12 @@ class Buddy(Gtk.DrawingArea):
         return min(elapsed_ms, catchup_ms)
 
     def _tick(self) -> bool:
+        lifecycle = getattr(self, "_lifecycle", None)
+        frame_before = (
+            (self.player.animation, self.player.frame_index)
+            if lifecycle is not None
+            else None
+        )
         elapsed_ms = Buddy._measure_tick_elapsed_ms(self)
         self._frame_elapsed_ms = elapsed_ms
 
@@ -1143,7 +1154,97 @@ class Buddy(Gtk.DrawingArea):
             and self.player.tick(elapsed_ms)
         ):
             self.queue_draw()
+        if lifecycle is not None:
+            lifecycle.tick(
+                advanced=(self.player.animation, self.player.frame_index)
+                != frame_before,
+                # Held drag poses change with pointer motion, not with time.
+                motion_budget_ms=motion_budget_ms(
+                    self.player.animation, held=dragging and not held_sway
+                ),
+            )
         return GLib.SOURCE_CONTINUE
+
+    def _start_lifecycle_watch(self) -> None:
+        """Debug-only: log which layer stops if Mochi's animation freezes (#45)."""
+        self._lifecycle = LifecycleWatch(
+            logger=self._logger,
+            snapshot=self._lifecycle_snapshot,
+        )
+        window = self._window
+
+        def edge(event: str) -> None:
+            if self._lifecycle is not None:
+                self._lifecycle.edge(event)
+
+        window.connect("map", lambda *_args: edge("window map"))
+        window.connect("unmap", lambda *_args: edge("window unmap"))
+        window.connect(
+            "notify::is-active",
+            lambda win, _pspec: edge(f"window active={win.is_active()}"),
+        )
+
+        def watch_surface(*_args) -> None:
+            surface = window.get_surface()
+            if surface is None:
+                return
+            surface.connect(
+                "notify::mapped",
+                lambda srf, _pspec: edge(f"surface mapped={srf.get_mapped()}"),
+            )
+            if isinstance(surface, Gdk.Toplevel):
+                surface.connect(
+                    "notify::state",
+                    lambda srf, _pspec: edge(
+                        "toplevel state="
+                        + ",".join(srf.get_state().value_nicks or ["none"])
+                    ),
+                )
+
+        def watch_frame_clock(*_args) -> None:
+            clock = self.get_frame_clock()
+            if clock is not None and self._lifecycle is not None:
+                clock.connect("after-paint", lambda *_a: self._lifecycle.painted())
+            edge("buddy realized")
+
+        def stop_checks(*_args) -> None:
+            edge("buddy unrealized")
+            if self._lifecycle is not None:
+                self._lifecycle.close()
+            if self._lifecycle_check_source_id is not None:
+                GLib.source_remove(self._lifecycle_check_source_id)
+                self._lifecycle_check_source_id = None
+
+        window.connect("realize", watch_surface)
+        self.connect("realize", watch_frame_clock)
+        self.connect("unrealize", stop_checks)
+        if window.get_realized():
+            watch_surface()
+
+        def check() -> bool:
+            if self._lifecycle is not None:
+                self._lifecycle.check()
+            return GLib.SOURCE_CONTINUE
+
+        self._lifecycle_check_source_id = GLib.timeout_add_seconds(1, check)
+
+    def _lifecycle_snapshot(self) -> str:
+        animation = self.player.animation
+        surface = self._window.get_surface()
+        clock = self.get_frame_clock()
+        return (
+            f"state={self.state.current.name} semantic={self._current_animation} "
+            f"rendered={animation.name if animation else None} "
+            f"frame={self.player.frame_index + 1}/"
+            f"{len(animation.frames) if animation else 0} "
+            f"elapsed={self.player.elapsed_ms}ms "
+            f"looping={animation.looping if animation else None} "
+            f"pending={self._pending_animation} "
+            f"window_mapped={self._window.get_mapped()} "
+            f"active={self._window.is_active()} "
+            f"surface_mapped={surface.get_mapped() if surface else None} "
+            f"frame_counter={clock.get_frame_counter() if clock else None}"
+        )
 
     def _begin_drag_visual(self, x: float, y: float) -> None:
         timestamp = time.monotonic()
@@ -1276,6 +1377,9 @@ class Buddy(Gtk.DrawingArea):
     def _draw(
         self, _area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int
     ) -> None:
+        lifecycle = getattr(self, "_lifecycle", None)
+        if lifecycle is not None:
+            lifecycle.drew()
         frame = self.player.frame
         if frame is None:
             frame = ANIMATIONS["default"].frames[0]
