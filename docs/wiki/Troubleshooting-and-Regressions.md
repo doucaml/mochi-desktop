@@ -363,6 +363,41 @@ Focus ambience is a long-running audio channel separate from short interaction s
 - shutdown during playback
 - test unavailable/missing audio backend where practical
 
+## 17. Animation freezes after Overview or workspace switches (#45)
+
+### Symptoms
+
+- Mochi stops animating after pressing Super or switching workspaces repeatedly
+- the process stays alive and no traceback is printed
+- a restart is the only recovery
+
+### Capture
+
+Run Mochi with debug logging and reproduce:
+
+```bash
+mochi --debug 2>&1 | tee mochi-45.log
+```
+
+`--debug` turns on a lifecycle watchdog. It never recovers anything; it names
+the layer that stopped, once, and logs again when it resumes:
+
+- `Lifecycle stall [ticks]`: the GLib animation timer stopped firing.
+- `Lifecycle stall [player]`: the timer runs, but the animation is not
+  advancing frames, so the bug is in state/animation ownership.
+- `Lifecycle stall [draw]`: frames advance, but GTK is not drawing them, so the
+  bug is in presentation (window, frame clock, or compositor). The
+  `last paint` age says whether GTK's frame clock stopped as well.
+
+Each warning carries a state/animation snapshot. Window and surface edges
+(`window map/unmap`, `window active`, `toplevel state`) are logged at debug
+level just before it.
+
+### Verify
+
+A healthy session under the same Overview/workspace stress logs no
+`Lifecycle stall` lines.
+
 ## Regression checklist before merging interaction changes
 
 - [ ] context menu releases input before dispatch
