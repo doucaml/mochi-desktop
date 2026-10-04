@@ -400,7 +400,7 @@ lines naming the blocking call). To print the stacks on demand while Mochi
 looks frozen:
 
 ```bash
-kill -USR1 "$(pgrep -f mochi | head -1)"
+kill -USR1 "$(pgrep -n -f '(^|/)mochi( |$)')"
 ```
 
 Both only print; Mochi keeps running. A long system suspend can also trigger
