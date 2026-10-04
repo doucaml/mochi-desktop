@@ -46,6 +46,25 @@ class _XEvent(ctypes.Union):
     ]
 
 
+def disable_frame_sync(window: Gtk.Window) -> bool:
+    """Stop GTK pausing this window until the compositor reports a frame drawn.
+
+    On X11, GTK freezes a window's frame clock after every painted frame and
+    only thaws it when the compositor answers with ``_NET_WM_FRAME_DRAWN`` (or
+    the window is unmapped); there is no timeout. If Mutter never answers for
+    one frame, the window never repaints again while everything else keeps
+    running: Mochi still moves and talks but his sprite is frozen (#45).
+    Without frame sync GTK paces frames itself, which is plenty for a small
+    sprite. Call before the first frame, e.g. on ``realize``.
+    """
+    surface = window.get_surface()
+    if GdkX11 is None or not isinstance(surface, GdkX11.X11Surface):
+        return False
+    # Deprecated since GTK 4.18 but still present; it only ever disables.
+    surface.set_frame_sync_enabled(False)
+    return True
+
+
 def request_keep_above(window: Gtk.Window) -> bool:
     """Ask an EWMH-compatible X11 window manager to keep Mochi above others."""
     surface = window.get_surface()

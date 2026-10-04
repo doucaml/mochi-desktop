@@ -19,6 +19,10 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 
 ### Fixed
 
+- Fixed the likely cause of Mochi's animation freezing on GNOME (#45). GTK paused his
+  window after each frame until GNOME Shell confirmed it was drawn, with no
+  timeout, so a single missed confirmation stopped his sprite while he kept
+  moving and talking. Mochi now paces his own frames.
 - Mochi's nameplate, speech bubble, and bond progress overlay are readable in
   light mode again. They used libadwaita-only theme colors that plain GTK does
   not define, so GTK dropped them and the nameplate showed white text with no
