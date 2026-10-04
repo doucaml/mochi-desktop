@@ -1209,6 +1209,8 @@ class Buddy(Gtk.DrawingArea):
 
         def stop_checks(*_args) -> None:
             edge("buddy unrealized")
+            if self._lifecycle is not None:
+                self._lifecycle.close()
             if self._lifecycle_check_source_id is not None:
                 GLib.source_remove(self._lifecycle_check_source_id)
                 self._lifecycle_check_source_id = None

@@ -393,6 +393,19 @@ Each warning carries a state/animation snapshot. Window and surface edges
 (`window map/unmap`, `window active`, `toplevel state`) are logged at debug
 level just before it.
 
+If Mochi's main loop itself is blocked, nothing above can run. For that case
+`--debug` also prints every Python thread's stack automatically after five
+seconds without a watchdog check (`Timeout (0:00:05)!` followed by `File …`
+lines naming the blocking call). To print the stacks on demand while Mochi
+looks frozen:
+
+```bash
+kill -USR1 "$(pgrep -f mochi | head -1)"
+```
+
+Both only print; Mochi keeps running. A long system suspend can also trigger
+the automatic dump, which is harmless.
+
 ### Verify
 
 A healthy session under the same Overview/workspace stress logs no

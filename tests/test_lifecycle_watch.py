@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import pytest
 
 from mochi.animation import Animation, AnimationFrame
-from mochi.lifecycle_watch import LifecycleWatch, motion_budget_ms
+from mochi.lifecycle_watch import HANG_DUMP_SECONDS, LifecycleWatch, motion_budget_ms
 
 
 @dataclass
@@ -33,6 +33,8 @@ def watch(clock: _Clock) -> LifecycleWatch:
         logger=logging.getLogger("test.lifecycle"),
         snapshot=lambda: "state=IDLE_EMOTE anim=wave",
         clock=clock,
+        arm_hang_dump=lambda _seconds: None,
+        cancel_hang_dump=lambda: None,
     )
 
 
@@ -125,6 +127,20 @@ def test_missing_ticks_is_a_tick_stall(watch, clock) -> None:
     assert watch.check() == ["ticks"]
 
 
+def test_player_is_not_blamed_for_time_without_ticks(watch, clock) -> None:
+    # A blocked main loop stops ticks; when they resume, the player gets a
+    # fresh budget instead of inheriting the whole gap as a "player" stall.
+    _healthy_second(watch, clock)
+    clock.advance(9.0)
+    watch.tick(advanced=False, motion_budget_ms=100)
+
+    assert watch.check() == []
+    for _ in range(25):
+        clock.advance(0.1)
+        watch.tick(advanced=False, motion_budget_ms=100)
+    assert watch.check() == ["player"]
+
+
 def test_stall_warning_says_whether_the_frame_clock_is_still_painting(
     watch, clock, caplog
 ) -> None:
@@ -168,3 +184,36 @@ def test_single_frames_and_held_poses_have_no_motion_budget() -> None:
     assert motion_budget_ms(_animation(100), held=False) is None
     assert motion_budget_ms(_animation(100, 100), held=True) is None
     assert motion_budget_ms(None, held=False) is None
+
+
+def test_every_check_rearms_the_hang_dump(clock) -> None:
+    armed: list[float] = []
+    watch = LifecycleWatch(
+        logger=logging.getLogger("test.lifecycle"),
+        snapshot=lambda: "",
+        clock=clock,
+        arm_hang_dump=armed.append,
+        cancel_hang_dump=lambda: armed.append(-1.0),
+    )
+
+    watch.check()
+    watch.check()
+    watch.close()
+
+    assert armed == [HANG_DUMP_SECONDS, HANG_DUMP_SECONDS, -1.0]
+
+
+def test_debug_stack_dumps_register_sigusr1(monkeypatch) -> None:
+    import faulthandler
+    import signal
+
+    from mochi import main as mochi_main
+
+    calls = []
+    monkeypatch.setattr(
+        faulthandler, "register", lambda signum, **kwargs: calls.append((signum, kwargs))
+    )
+
+    mochi_main.enable_debug_stack_dumps()
+
+    assert calls == [(signal.SIGUSR1, {"all_threads": True})]

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import logging
 import os
+import signal
 import sys
 from collections.abc import MutableMapping
 from pathlib import Path
@@ -52,6 +54,11 @@ def configure_display_backend(environment: MutableMapping[str, str]) -> bool:
     return True
 
 
+def enable_debug_stack_dumps() -> None:
+    """`kill -USR1 <pid>` prints every Python thread's stack to stderr."""
+    faulthandler.register(signal.SIGUSR1, all_threads=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     selected_xwayland = configure_display_backend(os.environ)
@@ -60,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(name)s: %(message)s",
     )
     if args.debug:
+        enable_debug_stack_dumps()
         logging.getLogger(__name__).debug(
             "Display environment: session_type=%r current_desktop=%r "
             "session_desktop=%r wayland_display=%r display=%r "
