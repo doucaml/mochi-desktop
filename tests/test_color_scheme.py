@@ -9,7 +9,7 @@ import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
-from mochi.appearance import SystemColorSchemeSync  # noqa: E402
+from mochi.color_scheme import SystemColorSchemeSync  # noqa: E402
 
 
 NO_PREFERENCE, PREFER_DARK, PREFER_LIGHT = 0, 1, 2
