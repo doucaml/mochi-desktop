@@ -56,7 +56,9 @@ Do not keep export ZIPs, spritesheets, Pixelorama source files, temporary render
 - `focus_thinking_start`, `focus_thinking_loop`, `focus_thinking_end` — user
   menu/focus-setup thinking transition, sustained loop, and exit transition.
 - `typing_intro`, `typing_loop`, `typing_outro` — sustained typing state.
-- `terminal_intro`, `terminal_loop`, `terminal_outro` — focused-terminal coworking state with authored entry and exit transitions.
+- `terminal_intro`, `terminal_loop`, `terminal_outro` — focused-terminal coworking state: Mochi takes out
+  a laptop, types tiredly, and puts it away. Imported from the Pixelorama export by
+  `tools/import_terminal_tired.py`, which also snaps export color drift to the canonical palette.
 - `watch` — media/watch-along state.
 - `searching` — file/search activity state.
 - `reading` — low-energy reading loop: the idle breathing body holding a small

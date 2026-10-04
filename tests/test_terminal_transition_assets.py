@@ -3,44 +3,74 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import cairo
+
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "assets" / "mochi" / "manifest.json"
+ASSETS = ROOT / "assets" / "mochi"
+MANIFEST = ASSETS / "manifest.json"
+
+
+def _animations() -> dict:
+    return json.loads(MANIFEST.read_text())["animations"]
+
+
+def _pixels(relative_path: str) -> bytes:
+    return bytes(cairo.ImageSurface.create_from_png(str(ASSETS / relative_path)).get_data())
+
+
+def _silhouette(relative_path: str) -> bytes:
+    # ARGB32 is stored little-endian as BGRA; keep only alpha.
+    return _pixels(relative_path)[3::4]
 
 
 def test_terminal_coworking_manifest_has_authored_transitions() -> None:
-    animations = json.loads(MANIFEST.read_text())["animations"]
+    animations = _animations()
 
     intro = animations["terminal_intro"]
     loop = animations["terminal_loop"]
     outro = animations["terminal_outro"]
 
     assert intro == {
-        "frames": [
-            "terminal/terminal_intro_01.png",
-            "terminal/terminal_intro_02.png",
-            "terminal/terminal_intro_03.png",
-            "terminal/terminal_intro_04.png",
-        ],
-        "frame_count": 4,
+        "frames": [f"terminal/terminal_intro_{index:02d}.png" for index in range(1, 10)],
+        "frame_count": 9,
         "fps": 8.333333333333334,
         "loop": False,
     }
-    assert loop["frame_count"] == 8
-    assert loop["loop"] is True
-    assert abs(loop["fps"] - (1000 / 120)) < 0.01
+    assert loop == {
+        "frames": [f"terminal/terminal_{index:02d}.png" for index in range(1, 7)],
+        "frame_count": 6,
+        "fps": 8.333333333333334,
+        "loop": True,
+    }
     assert outro == {
-        "frames": [
-            "terminal/terminal_outro_01.png",
-            "terminal/terminal_outro_02.png",
-            "terminal/terminal_outro_03.png",
-            "terminal/terminal_outro_04.png",
-        ],
-        "frame_count": 4,
+        "frames": [f"terminal/terminal_outro_{index:02d}.png" for index in range(1, 8)],
+        "frame_count": 7,
         "fps": 8.333333333333334,
         "loop": False,
     }
 
     for name in ("terminal_intro", "terminal_loop", "terminal_outro"):
         for relative_path in animations[name]["frames"]:
-            assert (ROOT / "assets" / "mochi" / relative_path).exists()
+            assert (ASSETS / relative_path).exists()
+
+
+def test_terminal_intro_opens_from_the_idle_silhouette() -> None:
+    animations = _animations()
+
+    assert _silhouette(animations["terminal_intro"]["frames"][0]) == _silhouette(
+        animations["idle"]["frames"][0]
+    )
+
+
+def test_terminal_outro_puts_the_laptop_away_by_reversing_the_intro() -> None:
+    animations = _animations()
+    intro = animations["terminal_intro"]["frames"]
+    outro = animations["terminal_outro"]["frames"]
+
+    # Closing ends on the exact pose opening started from, and the laptop goes
+    # away along the same frames it came out on.
+    assert _pixels(outro[-1]) == _pixels(intro[0])
+    assert [_pixels(path) for path in outro[1:]] == [
+        _pixels(path) for path in reversed(intro[:6])
+    ]

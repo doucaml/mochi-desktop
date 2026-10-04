@@ -511,9 +511,14 @@
         "terminal/terminal_intro_01.png",
         "terminal/terminal_intro_02.png",
         "terminal/terminal_intro_03.png",
-        "terminal/terminal_intro_04.png"
+        "terminal/terminal_intro_04.png",
+        "terminal/terminal_intro_05.png",
+        "terminal/terminal_intro_06.png",
+        "terminal/terminal_intro_07.png",
+        "terminal/terminal_intro_08.png",
+        "terminal/terminal_intro_09.png"
       ],
-      "frame_count": 4,
+      "frame_count": 9,
       "fps": 8.333333333333334,
       "loop": false
     },
@@ -524,11 +529,9 @@
         "terminal/terminal_03.png",
         "terminal/terminal_04.png",
         "terminal/terminal_05.png",
-        "terminal/terminal_06.png",
-        "terminal/terminal_07.png",
-        "terminal/terminal_08.png"
+        "terminal/terminal_06.png"
       ],
-      "frame_count": 8,
+      "frame_count": 6,
       "fps": 8.333333333333334,
       "loop": true
     },
@@ -537,9 +540,12 @@
         "terminal/terminal_outro_01.png",
         "terminal/terminal_outro_02.png",
         "terminal/terminal_outro_03.png",
-        "terminal/terminal_outro_04.png"
+        "terminal/terminal_outro_04.png",
+        "terminal/terminal_outro_05.png",
+        "terminal/terminal_outro_06.png",
+        "terminal/terminal_outro_07.png"
       ],
-      "frame_count": 4,
+      "frame_count": 7,
       "fps": 8.333333333333334,
       "loop": false
     },
