@@ -48,9 +48,12 @@ CANONICAL = {
 
 
 def load_frame(source: Path, index: int, *, source_name: str = SOURCE_NAME) -> Image.Image:
-    exported = Image.open(source / source_name.format(index=index)).convert("RGBA")
+    with Image.open(source / source_name.format(index=index)) as image:
+        exported = image.convert("RGBA")
     if exported.size != (RUNTIME_CELL, RUNTIME_CELL):
-        raise ValueError(f"frame {index} is {exported.size}, expected 256 x 256")
+        raise ValueError(
+            f"frame {index} is {exported.size}, expected {RUNTIME_CELL} x {RUNTIME_CELL}"
+        )
     cell = exported.resize((SOURCE_CELL, SOURCE_CELL), Image.Resampling.NEAREST)
     if cell.resize(exported.size, Image.Resampling.NEAREST).tobytes() != exported.tobytes():
         raise ValueError(f"frame {index} is not a clean 4x nearest-neighbor export")
@@ -67,6 +70,7 @@ def load_frame(source: Path, index: int, *, source_name: str = SOURCE_NAME) -> I
 
 
 def main(source: Path) -> None:
+    TARGET.mkdir(parents=True, exist_ok=True)
     for old in (*TARGET.glob("terminal_intro_*.png"), *TARGET.glob("terminal_outro_*.png")):
         old.unlink()
     outputs = {

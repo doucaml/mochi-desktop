@@ -34,6 +34,7 @@ def loop_order() -> list[int]:
 
 
 def main(source: Path) -> None:
+    TARGET.mkdir(parents=True, exist_ok=True)
     for old in TARGET.glob("terminal_[0-9][0-9].png"):
         old.unlink()
     for number, index in enumerate(loop_order(), start=1):
