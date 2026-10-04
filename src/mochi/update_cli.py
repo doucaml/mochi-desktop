@@ -8,6 +8,7 @@ from collections.abc import Callable
 from mochi.config import ConfigStore
 from mochi.update.bootstrap import bootstrap_updater
 from mochi.update.checker import UpdateChecker
+from mochi.update.constants import MAIN_CHANNEL, UPDATE_CHANNELS
 from mochi.update.model import UpdateStatus
 from mochi.update.storage import InstallMetadataStore
 
@@ -19,6 +20,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="install an available update without asking for confirmation",
     )
+    parser.add_argument(
+        "--channel",
+        choices=UPDATE_CHANNELS,
+        help=(
+            "remember which builds to follow: 'release' (default) for published "
+            "releases, or 'main' for every merged change (alpha testers)"
+        ),
+    )
     return parser
 
 
@@ -26,12 +35,21 @@ def main(
     argv: list[str] | None = None,
     *,
     checker: UpdateChecker | None = None,
+    config: ConfigStore | None = None,
     bootstrap: Callable[..., object] = bootstrap_updater,
     input_func: Callable[[str], str] = input,
 ) -> int:
     args = build_parser().parse_args(argv)
+    config = config or ConfigStore()
+    if args.channel is not None:
+        config.save_update_channel(args.channel)
+        if args.channel == MAIN_CHANNEL:
+            print("Mochi will now follow every change on main. 🧪")
+        else:
+            print("Mochi will now follow published releases. 🌱")
+
     selected_checker = checker or UpdateChecker(
-        config=ConfigStore(),
+        config=config,
         install_store=InstallMetadataStore(),
     )
     result = selected_checker.check(manual=True)

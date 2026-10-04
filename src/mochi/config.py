@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from mochi.care import BondState
+from mochi.update.constants import DEFAULT_UPDATE_CHANNEL, UPDATE_CHANNELS
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,20 @@ class ConfigStore:
     def save_update_checks_enabled(self, enabled: bool) -> None:
         data = self._load_or_empty()
         data["update_checks_enabled"] = bool(enabled)
+        self._save(data)
+
+    def load_update_channel(self) -> str:
+        try:
+            channel = self._load()["update_channel"]
+        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return DEFAULT_UPDATE_CHANNEL
+        return channel if channel in UPDATE_CHANNELS else DEFAULT_UPDATE_CHANNEL
+
+    def save_update_channel(self, channel: str) -> None:
+        if channel not in UPDATE_CHANNELS:
+            raise ValueError(f"unknown update channel: {channel!r}")
+        data = self._load_or_empty()
+        data["update_channel"] = channel
         self._save(data)
 
     def load_last_update_check(self) -> float | None:

@@ -119,6 +119,31 @@ class ConfigStoreTests(unittest.TestCase):
             self.assertIsNone(store.load_last_update_check())
             self.assertIsNone(store.load_dismissed_update_commit())
 
+    def test_update_channel_defaults_to_releases_and_round_trips(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = ConfigStore(Path(directory) / "config.json")
+
+            self.assertEqual(store.load_update_channel(), "release")
+
+            store.save_update_channel("main")
+            self.assertEqual(store.load_update_channel(), "main")
+
+            store.save_update_channel("release")
+            self.assertEqual(store.load_update_channel(), "release")
+
+            with self.assertRaises(ValueError):
+                store.save_update_channel("nightly")
+            self.assertEqual(store.load_update_channel(), "release")
+
+    def test_unknown_update_channel_falls_back_to_releases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            for raw in ('"nightly"', "true", '""'):
+                path.write_text(
+                    f'{{"update_channel": {raw}}}\n', encoding="utf-8"
+                )
+                self.assertEqual(ConfigStore(path).load_update_channel(), "release")
+
     def test_bond_state_defaults_round_trips_and_migrates_old_progress(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"

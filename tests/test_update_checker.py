@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from mochi.config import ConfigStore
 from mochi.update.checker import (
     AUTO_CHECK_INTERVAL_SECONDS,
@@ -25,8 +27,14 @@ class _FakeSource:
         metadata_error: Exception | None = None,
         relation: str = "ahead",
         compare_error: Exception | None = None,
+        release_tag: str = "v0.4.0-alpha.2",
+        release_sha: str = "release-sha",
+        release_error: Exception | None = None,
     ) -> None:
         self.sha = sha
+        self.release_tag = release_tag
+        self.release_sha = release_sha
+        self.release_error = release_error
         self.metadata = metadata or UpdateMetadata(
             version="0.4.0a1",
             channel="main",
@@ -43,6 +51,12 @@ class _FakeSource:
         if self.resolve_error is not None:
             raise self.resolve_error
         return self.sha
+
+    def resolve_latest_release(self) -> tuple[str, str]:
+        self.calls.append("release")
+        if self.release_error is not None:
+            raise self.release_error
+        return self.release_tag, self.release_sha
 
     def compare_commits(self, installed_commit: str, target_commit: str) -> str:
         self.calls.append(("compare", installed_commit, target_commit))
@@ -62,8 +76,11 @@ def _checker(
     *,
     installed_commit: str | None = "old-sha",
     source: _FakeSource | None = None,
+    channel: str | None = "main",
 ) -> tuple[UpdateChecker, ConfigStore, _FakeSource]:
     config = ConfigStore(tmp_path / "config.json")
+    if channel is not None:
+        config.save_update_channel(channel)
     install_store = InstallMetadataStore(tmp_path / "install.json")
     if installed_commit is not None:
         install_store.save(
@@ -227,6 +244,142 @@ def test_dismissed_commit_is_not_reannounced_but_newer_commit_is(tmp_path: Path)
     assert newer.target is not None
     assert newer.target.commit == "newer-sha"
     assert newer.announce is True
+
+
+def test_release_channel_is_the_default_and_targets_the_latest_release(
+    tmp_path: Path,
+) -> None:
+    checker, _config, source = _checker(tmp_path, channel=None)
+
+    result = checker.check(manual=True, now=1_000.0)
+
+    assert result.status is UpdateStatus.UPDATE_AVAILABLE
+    assert result.target is not None
+    assert result.target.commit == "release-sha"
+    assert result.target.metadata.channel == "release"
+    assert result.target.metadata.highlights == ("one", "two")
+    assert source.calls == [
+        "release",
+        ("compare", "old-sha", "release-sha"),
+        ("metadata", "release-sha"),
+    ]
+
+
+def test_release_channel_never_downgrades_a_newer_main_build(tmp_path: Path) -> None:
+    source = _FakeSource(relation="behind")
+    checker, _config, source = _checker(
+        tmp_path,
+        installed_commit="newer-main-sha",
+        source=source,
+        channel="release",
+    )
+
+    result = checker.check(manual=True, now=1_000.0)
+
+    assert result.status is UpdateStatus.UP_TO_DATE
+    assert result.target is None
+    assert source.calls == [
+        "release",
+        ("compare", "newer-main-sha", "release-sha"),
+    ]
+
+
+def test_installed_release_is_up_to_date_without_comparing(tmp_path: Path) -> None:
+    checker, _config, source = _checker(
+        tmp_path,
+        installed_commit="release-sha",
+        channel="release",
+    )
+
+    result = checker.check(manual=True, now=1_000.0)
+
+    assert result.status is UpdateStatus.UP_TO_DATE
+    assert source.calls == ["release"]
+
+
+def test_release_lookup_failure_is_safe_and_records_check_time(
+    tmp_path: Path,
+) -> None:
+    source = _FakeSource(release_error=TimeoutError("offline"))
+    checker, config, _source = _checker(tmp_path, source=source, channel="release")
+
+    result = checker.check(manual=False, now=1_234.5)
+
+    assert result.status is UpdateStatus.CHECK_FAILED
+    assert "offline" in (result.error or "")
+    assert config.load_last_update_check() == 1_234.5
+
+
+def test_release_metadata_fallback_names_the_release_tag(tmp_path: Path) -> None:
+    source = _FakeSource(metadata_error=ValueError("bad metadata"))
+    checker, _config, _source = _checker(tmp_path, source=source, channel="release")
+
+    result = checker.check(manual=True, now=1_000.0)
+
+    assert result.status is UpdateStatus.UPDATE_AVAILABLE
+    assert result.target is not None
+    assert result.target.commit == "release-sha"
+    assert result.target.metadata.version == "v0.4.0-alpha.2"
+    assert result.target.metadata.channel == "release"
+
+
+def test_target_records_the_followed_channel_not_update_json(tmp_path: Path) -> None:
+    # update.json at a release commit still says "main"; the installed build
+    # should record the channel that actually found it.
+    source = _FakeSource(
+        metadata=UpdateMetadata(version="0.4.0a2", channel="main"),
+    )
+    checker, _config, _source = _checker(tmp_path, source=source, channel="release")
+
+    result = checker.check(manual=True, now=1_000.0)
+
+    assert result.target is not None
+    assert result.target.metadata.channel == "release"
+    assert result.target.metadata.version == "0.4.0a2"
+
+
+def test_github_source_resolves_latest_release_to_its_commit() -> None:
+    calls: list[str] = []
+
+    def read_url(url: str, timeout: float) -> bytes:
+        calls.append(url)
+        if url.endswith("/releases/latest"):
+            return json.dumps({"tag_name": "v0.4.0-alpha.2"}).encode()
+        if url.endswith("/commits/v0.4.0-alpha.2"):
+            return json.dumps({"sha": "def456"}).encode()
+        raise AssertionError(url)
+
+    source = GitHubUpdateSource(read_url=read_url)
+
+    assert source.resolve_latest_release() == ("v0.4.0-alpha.2", "def456")
+    assert calls == [
+        "https://api.github.com/repos/miflow13/mochi-desktop/releases/latest",
+        "https://api.github.com/repos/miflow13/mochi-desktop/commits/v0.4.0-alpha.2",
+    ]
+
+
+def test_github_source_rejects_a_release_without_a_tag() -> None:
+    def read_url(url: str, timeout: float) -> bytes:
+        return json.dumps({"tag_name": "  "}).encode()
+
+    source = GitHubUpdateSource(read_url=read_url)
+
+    with pytest.raises(ValueError, match="tag"):
+        source.resolve_latest_release()
+
+
+def test_github_source_escapes_release_tags_in_commit_urls() -> None:
+    calls: list[str] = []
+
+    def read_url(url: str, timeout: float) -> bytes:
+        calls.append(url)
+        if url.endswith("/releases/latest"):
+            return json.dumps({"tag_name": "../main"}).encode()
+        return json.dumps({"sha": "abc"}).encode()
+
+    GitHubUpdateSource(read_url=read_url).resolve_latest_release()
+
+    assert calls[1].endswith("/commits/..%2Fmain")
 
 
 def test_github_source_pins_metadata_to_resolved_commit() -> None:

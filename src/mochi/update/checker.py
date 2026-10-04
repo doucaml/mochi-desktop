@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import time
 from collections.abc import Callable
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from mochi.config import ConfigStore
 
-from .constants import OFFICIAL_REPOSITORY
+from .constants import MAIN_CHANNEL, OFFICIAL_REPOSITORY
 from .model import (
     UpdateCheckResult,
     UpdateMetadata,
@@ -43,9 +45,33 @@ class GitHubUpdateSource:
         self._timeout_seconds = float(timeout_seconds)
 
     def resolve_main_sha(self) -> str:
+        return self._resolve_commit_sha("main")
+
+    def resolve_latest_release(self) -> tuple[str, str]:
+        """Return the latest published release's tag and the commit it names.
+
+        GitHub's "latest" release excludes drafts and prereleases, so marking a
+        release as a prerelease keeps it away from the release channel.
+        """
         url = (
             "https://api.github.com/repos/"
-            f"{OFFICIAL_REPOSITORY}/commits/main"
+            f"{OFFICIAL_REPOSITORY}/releases/latest"
+        )
+        data = json.loads(
+            self._read_url(url, self._timeout_seconds).decode("utf-8")
+        )
+        if not isinstance(data, dict):
+            raise ValueError("GitHub release response must be an object")
+        tag = data.get("tag_name")
+        if not isinstance(tag, str) or not tag.strip():
+            raise ValueError("GitHub release response did not include a tag")
+        tag = tag.strip()
+        return tag, self._resolve_commit_sha(tag)
+
+    def _resolve_commit_sha(self, ref: str) -> str:
+        url = (
+            "https://api.github.com/repos/"
+            f"{OFFICIAL_REPOSITORY}/commits/{quote(ref, safe='')}"
         )
         data = json.loads(
             self._read_url(url, self._timeout_seconds).decode("utf-8")
@@ -153,8 +179,15 @@ class UpdateChecker:
                 error="installed commit is unknown",
             )
 
+        channel = self._config.load_update_channel()
         try:
-            target_commit = self._source.resolve_main_sha()
+            if channel == MAIN_CHANNEL:
+                target_commit = self._source.resolve_main_sha()
+                fallback_version = "latest main"
+            else:
+                fallback_version, target_commit = (
+                    self._source.resolve_latest_release()
+                )
         except Exception as error:
             self._config.save_last_update_check(checked_at)
             return UpdateCheckResult(
@@ -181,11 +214,10 @@ class UpdateChecker:
         try:
             metadata = self._source.fetch_metadata(target_commit)
         except Exception:
-            metadata = UpdateMetadata(
-                version="latest main",
-                channel="main",
-                highlights=(),
-            )
+            metadata = UpdateMetadata(version=fallback_version, channel=channel)
+        # update.json names the branch it was written on; the installed build
+        # should record the channel that actually found it.
+        metadata = dataclasses.replace(metadata, channel=channel)
 
         target = UpdateTarget(commit=target_commit, metadata=metadata)
         return UpdateCheckResult(

@@ -4,6 +4,6 @@
   "highlights": [
     "Update & Restart now brings Mochi back after installing instead of leaving him closed.",
     "If an update fails, Show Details now explains what went wrong.",
-    "Drag files, folders, links, text, and images onto Mochi with the new Pocket."
+    "Mochi now updates from published releases; testers can follow main with mochi-update --channel main."
   ]
 }
