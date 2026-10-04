@@ -11,6 +11,9 @@ a palindrome: frames 17-22 are frames 6-1 reversed. It is split into:
                                   so 15 -> 10 is the artist's own seam
     terminal_outro  frames 16-22  last typing pose, laptop put away
 
+The loop has since been redrawn; import_terminal_loop.py writes it. This
+script only writes the intro and outro, so re-running it keeps the new loop.
+
 Export drift left Mochi's colors 1-4 RGB units off the canonical palette, and
 the export has a single dark color where Mochi uses two. Snapping them makes
 frame 1 match the idle silhouette and colors, so idle -> intro does not pop.
@@ -32,7 +35,6 @@ SOURCE_CELL = 64
 RUNTIME_CELL = 256
 
 INTRO = range(1, 10)
-LOOP = range(10, 16)
 OUTRO = range(16, 23)
 
 CANONICAL = {
@@ -45,10 +47,13 @@ CANONICAL = {
 }
 
 
-def load_frame(source: Path, index: int) -> Image.Image:
-    exported = Image.open(source / SOURCE_NAME.format(index=index)).convert("RGBA")
+def load_frame(source: Path, index: int, *, source_name: str = SOURCE_NAME) -> Image.Image:
+    with Image.open(source / source_name.format(index=index)) as image:
+        exported = image.convert("RGBA")
     if exported.size != (RUNTIME_CELL, RUNTIME_CELL):
-        raise ValueError(f"frame {index} is {exported.size}, expected 256 x 256")
+        raise ValueError(
+            f"frame {index} is {exported.size}, expected {RUNTIME_CELL} x {RUNTIME_CELL}"
+        )
     cell = exported.resize((SOURCE_CELL, SOURCE_CELL), Image.Resampling.NEAREST)
     if cell.resize(exported.size, Image.Resampling.NEAREST).tobytes() != exported.tobytes():
         raise ValueError(f"frame {index} is not a clean 4x nearest-neighbor export")
@@ -65,17 +70,17 @@ def load_frame(source: Path, index: int) -> Image.Image:
 
 
 def main(source: Path) -> None:
-    for old in TARGET.glob("terminal*.png"):
+    TARGET.mkdir(parents=True, exist_ok=True)
+    for old in (*TARGET.glob("terminal_intro_*.png"), *TARGET.glob("terminal_outro_*.png")):
         old.unlink()
     outputs = {
         "terminal_intro_{:02d}.png": INTRO,
-        "terminal_{:02d}.png": LOOP,
         "terminal_outro_{:02d}.png": OUTRO,
     }
     for pattern, indices in outputs.items():
         for number, index in enumerate(indices, start=1):
             load_frame(source, index).save(TARGET / pattern.format(number), optimize=True)
-    print(f"wrote {len(INTRO)} intro, {len(LOOP)} loop, {len(OUTRO)} outro frames")
+    print(f"wrote {len(INTRO)} intro and {len(OUTRO)} outro frames")
 
 
 if __name__ == "__main__":
