@@ -111,3 +111,43 @@ def test_cli_check_failure_is_friendly_and_nonzero(capsys) -> None:
     output = capsys.readouterr().out.lower()
     assert "couldn't check" in output
     assert "offline" in output
+
+
+def test_cli_channel_switch_is_saved_before_checking(tmp_path: Path, capsys) -> None:
+    from mochi.config import ConfigStore
+
+    config = ConfigStore(tmp_path / "config.json")
+    seen_channels = []
+
+    class _RecordingChecker(_Checker):
+        def check(self, *, manual: bool, now=None):
+            seen_channels.append(config.load_update_channel())
+            return super().check(manual=manual, now=now)
+
+    checker = _RecordingChecker(UpdateCheckResult(status=UpdateStatus.UP_TO_DATE))
+
+    result = update_cli.main(["--channel", "main"], checker=checker, config=config)
+
+    assert result == 0
+    assert config.load_update_channel() == "main"
+    assert seen_channels == ["main"]
+    assert "every change on main" in capsys.readouterr().out
+
+
+def test_cli_without_channel_leaves_the_saved_channel_alone(tmp_path: Path) -> None:
+    from mochi.config import ConfigStore
+
+    config = ConfigStore(tmp_path / "config.json")
+    config.save_update_channel("main")
+    checker = _Checker(UpdateCheckResult(status=UpdateStatus.UP_TO_DATE))
+
+    update_cli.main([], checker=checker, config=config)
+
+    assert config.load_update_channel() == "main"
+
+
+def test_cli_rejects_unknown_channels() -> None:
+    import pytest
+
+    with pytest.raises(SystemExit):
+        update_cli.build_parser().parse_args(["--channel", "nightly"])

@@ -18,6 +18,20 @@ Artists do not need to implement Python behavior to contribute an animation. Sta
 
 Runtime integration can be handled separately. Artwork accepted into the production library must still follow the asset rules in [assets/mochi/README.md](assets/mochi/README.md).
 
+## Releasing
+
+Installed Mochi updates from the **latest published GitHub Release**, so
+merging to `main` does not ship to users by itself. To ship:
+
+1. Update `CHANGELOG.md`, the version in `pyproject.toml`, and the
+   `version`/`highlights` in `update.json` (the update window shows up to three
+   highlights).
+2. Tag the release commit on `main` (for example `v0.4.0-alpha.2`) and publish
+   a GitHub Release for that tag.
+3. Publish it as a normal release, **not a prerelease**. GitHub's "latest
+   release" skips prereleases and drafts, so marking a release as a prerelease
+   keeps it away from users while testers on `--channel main` try it.
+
 ## Commit style
 
 Use short, descriptive conventional prefixes:

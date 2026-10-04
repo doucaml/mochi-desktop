@@ -6,6 +6,14 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 
 ## Unreleased
 
+### Changed
+
+- Installed Mochi now updates from **published GitHub Releases** instead of
+  every commit on `main`, so a change has to ship in a release before it
+  reaches everyone. Alpha testers can keep following `main` with
+  `mochi-update --channel main` (and return with `--channel release`).
+  Switching channels never downgrades an installed build.
+
 ### Fixed
 
 - Mochi's nameplate, speech bubble, and bond progress overlay are readable in

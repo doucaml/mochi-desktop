@@ -188,9 +188,10 @@ personality pillar. It provides quiet update discovery, a user-approved
 **Update & Restart** flow, an exact-commit staged install, startup verification,
 and rollback while preserving local relationship/configuration data.
 
-During the public alpha, the updater follows `main`. A later stable channel may
-move ordinary users to signed/versioned GitHub Release artifacts without
-changing the in-app experience.
+The updater follows the latest published GitHub Release by default; alpha
+testers can opt into every `main` commit with `mochi-update --channel main`.
+Signed release artifacts remain possible later without changing the in-app
+experience.
 
 ### v0.4 — Develops Personality
 

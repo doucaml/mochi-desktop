@@ -58,7 +58,7 @@ through the time you naturally spend together.
 ## What's new lately
 
 -  **Built-in Mochi updater** — Mochi can now check for new builds, show a polished
-  GTK update window, install an exact newer `main` commit through a staged restart,
+  GTK update window, install the exact newer release commit through a staged restart,
   and keep the previous runtime recoverable if something goes wrong. Update checks
   are quiet, opt-in for installation, and development builds will not be downgraded
   to an older or diverged `main`.
@@ -302,8 +302,19 @@ You can also check manually from Mochi's right-click menu or run:
 mochi-update
 ```
 
-The current alpha update channel follows the latest commit on `main`. One
-update attempt is pinned to the exact commit Mochi found, downloads a clean
+By default Mochi follows **published releases**: it only offers the newest
+GitHub Release, so changes merged to `main` reach you once they ship in a
+release. Alpha testers who want every merged change can switch channels:
+
+```bash
+mochi-update --channel main     # follow every change on main
+mochi-update --channel release  # back to published releases (default)
+```
+
+Switching channels never downgrades Mochi. If your installed build is newer
+than the latest release, Mochi stays put until a newer release exists.
+
+One update attempt is pinned to the exact commit Mochi found, downloads a clean
 archive of that commit, moves the current runtime aside as a backup, builds the
 replacement in its place, and checks that it loads correctly. The backup is
 kept until the updated Mochi starts successfully. If the new build fails or
