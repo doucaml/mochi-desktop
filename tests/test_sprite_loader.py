@@ -89,6 +89,28 @@ class AnimationAssetSetTests(unittest.TestCase):
                 name,
             )
 
+    def test_reading_loop_keeps_the_idle_silhouette(self) -> None:
+        assets = AnimationAssetSet()
+
+        reading = assets.animation("reading")
+        self.assertEqual(len(reading.frames), 24)
+        self.assertTrue(reading.looping)
+
+        def silhouette(surface: cairo.ImageSurface) -> bytes:
+            # ARGB32 is stored little-endian as BGRA; keep only alpha.
+            return bytes(surface.get_data())[3::4]
+
+        idle_shapes = {
+            silhouette(surface) for surface in assets.load_frames("idle").values()
+        }
+        loaded = assets.load_frames("reading")
+        for key in assets.animations["reading"].frame_paths:
+            # Same outline as a breathing frame, so idle ⇄ reading never pops.
+            self.assertTrue(
+                silhouette(loaded[key]) in idle_shapes,
+                f"{key} changes Mochi's outline",
+            )
+
     def test_manifest_is_the_complete_runtime_png_inventory(self) -> None:
         assets = AnimationAssetSet()
         declared: set[str] = set()

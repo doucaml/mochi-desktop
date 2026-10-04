@@ -439,6 +439,16 @@
       "fps": 2,
       "loop": true
     },
+    "reading": {
+      "spritesheet": "reading/reading.png",
+      "frame_count": 24,
+      "fps": 6,
+      "loop": true,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
     "searching": {
       "frames": [
         "searching/searching_01.png",
