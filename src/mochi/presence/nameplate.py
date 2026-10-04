@@ -362,8 +362,8 @@ class Nameplate:
                 background: transparent;
             }
             .mochi-nameplate-text {
-                background: alpha(@window_bg_color, 0.96);
-                color: @window_fg_color;
+                background: alpha(@theme_bg_color, 0.96);
+                color: @theme_fg_color;
                 border: 1px solid alpha(#79c98b, 0.30);
                 border-radius: 999px;
                 box-shadow: 0 5px 16px alpha(black, 0.14);
@@ -378,7 +378,7 @@ class Nameplate:
                 padding: 0;
             }
             popover.mochi-nameplate-popover > arrow {
-                background: alpha(@window_bg_color, 0.96);
+                background: alpha(@theme_bg_color, 0.96);
                 border-color: alpha(#79c98b, 0.30);
             }
             """
