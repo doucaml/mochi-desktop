@@ -43,6 +43,23 @@
       "fps": 1.5,
       "loop": true
     },
+    "sad_idle": {
+      "frames": [
+        "sad_idle/sad_idle_01.png",
+        "sad_idle/sad_idle_02.png",
+        "sad_idle/sad_idle_03.png",
+        "sad_idle/sad_idle_04.png",
+        "sad_idle/sad_idle_05.png",
+        "sad_idle/sad_idle_06.png"
+      ],
+      "frame_count": 6,
+      "fps": 2,
+      "loop": true,
+      "source_cell_size": [
+        128,
+        128
+      ]
+    },
     "look": {
       "frames": [
         "look/look_01.png",
@@ -241,6 +258,21 @@
       "fps": 8.333333333333334,
       "loop": false
     },
+    "pocket_grab": {
+      "frames": [
+        "pocket_grab/mochi_pocket_grab_0001.png",
+        "pocket_grab/mochi_pocket_grab_0002.png",
+        "pocket_grab/mochi_pocket_grab_0003.png",
+        "pocket_grab/mochi_pocket_grab_0004.png",
+        "pocket_grab/mochi_pocket_grab_0005.png",
+        "pocket_grab/mochi_pocket_grab_0006.png",
+        "pocket_grab/mochi_pocket_grab_0007.png",
+        "pocket_grab/mochi_pocket_grab_0008.png"
+      ],
+      "frame_count": 8,
+      "fps": 8.333333333333334,
+      "loop": false
+    },
     "computer": {
       "frames": [
         "computer/computer_01.png",
@@ -263,6 +295,97 @@
       "frame_count": 16,
       "fps": 10,
       "loop": false
+    },
+    "focus_start": {
+      "frames": [
+        "focus/focus_start_01.png",
+        "focus/focus_start_02.png",
+        "focus/focus_start_03.png",
+        "focus/focus_start_04.png"
+      ],
+      "frame_count": 4,
+      "fps": 8.333333333333334,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "focus_loop": {
+      "spritesheet": "focus/focus_loop.png",
+      "frame_count": 24,
+      "fps": 7.142857142857143,
+      "loop": true,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "focus_stop": {
+      "frames": [
+        "focus/focus_stop_01.png",
+        "focus/focus_stop_02.png",
+        "focus/focus_stop_03.png",
+        "focus/focus_stop_04.png"
+      ],
+      "frame_count": 4,
+      "fps": 8.333333333333334,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "focus_thinking_start": {
+      "frames": [
+        "focus_thinking/focus_thinking_start_01.png",
+        "focus_thinking/focus_thinking_start_02.png",
+        "focus_thinking/focus_thinking_start_03.png",
+        "focus_thinking/focus_thinking_start_04.png",
+        "focus_thinking/focus_thinking_start_05.png"
+      ],
+      "frame_count": 5,
+      "fps": 7.142857142857143,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "focus_thinking_loop": {
+      "frames": [
+        "focus_thinking/focus_thinking_loop_01.png",
+        "focus_thinking/focus_thinking_loop_02.png",
+        "focus_thinking/focus_thinking_loop_03.png",
+        "focus_thinking/focus_thinking_loop_04.png",
+        "focus_thinking/focus_thinking_loop_05.png",
+        "focus_thinking/focus_thinking_loop_06.png",
+        "focus_thinking/focus_thinking_loop_07.png",
+        "focus_thinking/focus_thinking_loop_08.png"
+      ],
+      "frame_count": 8,
+      "fps": 7.142857142857143,
+      "loop": true,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "focus_thinking_end": {
+      "frames": [
+        "focus_thinking/focus_thinking_end_01.png",
+        "focus_thinking/focus_thinking_end_02.png",
+        "focus_thinking/focus_thinking_end_03.png",
+        "focus_thinking/focus_thinking_end_04.png",
+        "focus_thinking/focus_thinking_end_05.png"
+      ],
+      "frame_count": 5,
+      "fps": 7.142857142857143,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
     },
     "typing_loop": {
       "frames": [
@@ -315,6 +438,16 @@
       "frame_count": 8,
       "fps": 2,
       "loop": true
+    },
+    "reading": {
+      "spritesheet": "reading/reading.png",
+      "frame_count": 24,
+      "fps": 6,
+      "loop": true,
+      "source_cell_size": [
+        64,
+        64
+      ]
     },
     "searching": {
       "frames": [
@@ -378,9 +511,14 @@
         "terminal/terminal_intro_01.png",
         "terminal/terminal_intro_02.png",
         "terminal/terminal_intro_03.png",
-        "terminal/terminal_intro_04.png"
+        "terminal/terminal_intro_04.png",
+        "terminal/terminal_intro_05.png",
+        "terminal/terminal_intro_06.png",
+        "terminal/terminal_intro_07.png",
+        "terminal/terminal_intro_08.png",
+        "terminal/terminal_intro_09.png"
       ],
-      "frame_count": 4,
+      "frame_count": 9,
       "fps": 8.333333333333334,
       "loop": false
     },
@@ -393,9 +531,12 @@
         "terminal/terminal_05.png",
         "terminal/terminal_06.png",
         "terminal/terminal_07.png",
-        "terminal/terminal_08.png"
+        "terminal/terminal_08.png",
+        "terminal/terminal_09.png",
+        "terminal/terminal_10.png",
+        "terminal/terminal_11.png"
       ],
-      "frame_count": 8,
+      "frame_count": 11,
       "fps": 8.333333333333334,
       "loop": true
     },
@@ -404,9 +545,12 @@
         "terminal/terminal_outro_01.png",
         "terminal/terminal_outro_02.png",
         "terminal/terminal_outro_03.png",
-        "terminal/terminal_outro_04.png"
+        "terminal/terminal_outro_04.png",
+        "terminal/terminal_outro_05.png",
+        "terminal/terminal_outro_06.png",
+        "terminal/terminal_outro_07.png"
       ],
-      "frame_count": 4,
+      "frame_count": 7,
       "fps": 8.333333333333334,
       "loop": false
     },
@@ -495,6 +639,84 @@
         64,
         64
       ]
+    },
+    "this_is_fine": {
+      "spritesheet": "this_is_fine/this_is_fine.png",
+      "frame_count": 16,
+      "fps": 8.333333333333334,
+      "loop": false,
+      "source_cell_size": [
+        256,
+        256
+      ]
+    },
+    "level_up_default": {
+      "spritesheet": "level_up_default/level_up_default.png",
+      "frame_count": 16,
+      "fps": 8.333333333333334,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "wave": {
+      "spritesheet": "wave/wave.png",
+      "frame_count": 8,
+      "fps": 8.333333333333334,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "vs_code": {
+      "spritesheet": "vs_code/vs_code.png",
+      "frame_count": 14,
+      "fps": 4.166666666666667,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "mochi_exe": {
+      "spritesheet": "mochi_exe/mochi_exe.png",
+      "frame_count": 16,
+      "fps": 8.333333333333334,
+      "loop": false,
+      "source_cell_size": [
+        64,
+        64
+      ]
+    },
+    "coffee": {
+      "frames": [
+        "coffee/mochi_coffee_0001.png",
+        "coffee/mochi_coffee_0002.png",
+        "coffee/mochi_coffee_0003.png",
+        "coffee/mochi_coffee_0004.png",
+        "coffee/mochi_coffee_0005.png",
+        "coffee/mochi_coffee_0006.png",
+        "coffee/mochi_coffee_0007.png",
+        "coffee/mochi_coffee_0008.png",
+        "coffee/mochi_coffee_0009.png",
+        "coffee/mochi_coffee_0010.png",
+        "coffee/mochi_coffee_0011.png",
+        "coffee/mochi_coffee_0012.png",
+        "coffee/mochi_coffee_0013.png",
+        "coffee/mochi_coffee_0014.png",
+        "coffee/mochi_coffee_0015.png",
+        "coffee/mochi_coffee_0016.png",
+        "coffee/mochi_coffee_0017.png",
+        "coffee/mochi_coffee_0018.png",
+        "coffee/mochi_coffee_0019.png",
+        "coffee/mochi_coffee_0020.png",
+        "coffee/mochi_coffee_0021.png"
+      ],
+      "frame_count": 21,
+      "fps": 8.333333333333334,
+      "loop": false
     }
   }
 }

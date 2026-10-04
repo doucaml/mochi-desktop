@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 import time
 
 from gi.repository import GLib, Gtk
@@ -33,6 +32,7 @@ class PresenceBuddyMixin:
         # developer stress-test profile rather than defining normal behavior.
         self._presence_chatty_test_mode = False
         self._presence_chatty_switch: Gtk.Switch | None = None
+        self._presence_context_preview_selector: Gtk.DropDown | None = None
         self._stay_put = False
         self._stay_put_switch: Gtk.Switch | None = None
         self._presence_started_at = time.monotonic()
@@ -43,6 +43,8 @@ class PresenceBuddyMixin:
         self._session_signal_monitor: SessionSignalMonitor | None = None
         self._presence_app_category = "unknown"
         self._presence_source_id: int | None = None
+        self._presence_startup_wave_source_id: int | None = None
+        self._presence_startup_wave_played = False
         self._presence_startup_source_id: int | None = None
         self._presence_shutting_down = False
         self._presence_is_returning_session = False
@@ -84,6 +86,7 @@ class PresenceBuddyMixin:
         )
         self._system_signal_monitor.start()
         self._app_category_monitor = AppCategorySignalAdapter(
+            on_category_snapshot=self._on_presence_app_category_snapshot,
             on_category_changed=self._on_presence_app_category_changed,
             logger=self._logger,
         )
@@ -95,6 +98,7 @@ class PresenceBuddyMixin:
                 self._app_category_monitor.last_error,
             )
         self._logger.debug("[session] startup baselines initialized")
+        self._schedule_startup_wave()
         self._presence_source_id = GLib.timeout_add_seconds(
             self.PRESENCE_EVALUATION_SECONDS,
             self._evaluate_ambient_presence,
@@ -166,25 +170,9 @@ class PresenceBuddyMixin:
         self._logger.info("Stay put %s", "enabled" if self._stay_put else "disabled")
 
     def _choose_idle_action(self) -> bool:
-        """Suppress only autonomous walking while Stay put is enabled."""
-        if not self._stay_put or self._user_idle:
-            return super()._choose_idle_action()
+        """Keep catalogue emotes active while Stay put suppresses only walking."""
 
-        self._idle_action_source_id = None
-        try:
-            if self.state.current is not MochiState.IDLE or self._context_menu_open:
-                return GLib.SOURCE_REMOVE
-
-            # Keep the same 25% squish chance as the normal idle pool; only the
-            # autonomous walk slot is removed. Reading/other quiet emotes can be
-            # added to this ambient pool later without changing movement logic.
-            action = random.choice(("squish", None, None, None))
-            if action == "squish":
-                self._transition_to(MochiState.SQUISHING)
-                self._play_animation("squish")
-            return GLib.SOURCE_REMOVE
-        finally:
-            self._schedule_idle_action()
+        return self._choose_idle_action_with_walk(allow_walk=not self._stay_put)
 
     def _build_developer_menu(self):
         """Extend Mochi Lab with isolated AmbiSense controls.
@@ -247,6 +235,21 @@ class PresenceBuddyMixin:
             "system-run-symbolic",
             self._test_presence_contextual,
         )
+        context_preview_row = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            spacing=10,
+        )
+        context_preview_row.add_css_class("mochi-setting-row")
+        context_preview_label = Gtk.Label(label="Context preview")
+        context_preview_label.set_xalign(0)
+        context_preview_label.set_hexpand(True)
+        context_preview_row.append(context_preview_label)
+        self._presence_context_preview_selector = Gtk.DropDown.new_from_strings(
+            ("Current app", "Browser", "VS Code", "Terminal", "Editor", "Pixel art")
+        )
+        context_preview_row.append(self._presence_context_preview_selector)
+        card.append(context_preview_row)
+        animated_rows.append(context_preview_row)
         card.append(contextual_button)
         animated_rows.append(contextual_button)
 
@@ -434,13 +437,25 @@ class PresenceBuddyMixin:
         self._preview_presence_category("ambient")
 
     def _test_presence_contextual(self, _button: Gtk.Button) -> None:
-        category = {
+        selected = (
+            0
+            if self._presence_context_preview_selector is None
+            else self._presence_context_preview_selector.get_selected()
+        )
+        forced_category = {
+            1: "browser",
+            2: "vscode",
+            3: "terminal",
+            4: "developer",
+            5: "creative",
+        }.get(selected)
+        category = forced_category or {
             "vscode": "vscode",
             "editor": "developer",
-            "terminal": "developer",
+            "terminal": "terminal",
             "pixel_art": "creative",
             "media": "media",
-            "browser": "focus",
+            "browser": "browser",
         }.get(self._presence_app_category, "ambient")
         self._preview_presence_category(category)
 
@@ -518,6 +533,36 @@ class PresenceBuddyMixin:
             # phrase for variety but do not spend the normal cooldown budget.
             self._ambient_presence_engine.phrases.remember(text)
             self._logger.debug("[session] %s greeting text=%r", category, text)
+        return GLib.SOURCE_REMOVE
+
+    def _schedule_startup_wave(self) -> None:
+        """Play the welcome wave once GTK has presented Mochi's window."""
+        if (
+            self._preview_mode
+            or self._presence_shutting_down
+            or self._presence_startup_wave_played
+            or self._presence_startup_wave_source_id is not None
+        ):
+            return
+        self._presence_startup_wave_source_id = GLib.idle_add(
+            self._play_startup_wave,
+        )
+
+    def _play_startup_wave(self) -> bool:
+        self._presence_startup_wave_source_id = None
+        if (
+            self._presence_shutting_down
+            or self._preview_mode
+            or self._presence_startup_wave_played
+        ):
+            return GLib.SOURCE_REMOVE
+
+        self._presence_startup_wave_played = True
+        if (
+            self.state.current is MochiState.IDLE
+            and self._is_idle_visual_active()
+        ):
+            self._play_autonomous_catalogue_emote("wave")
         return GLib.SOURCE_REMOVE
 
     def set_presence_quiet_mode(self, enabled: bool) -> None:
@@ -621,9 +666,15 @@ class PresenceBuddyMixin:
         self._ambient_presence_engine.note_session_returned()
         self._on_user_active()
 
+    def _on_presence_app_category_snapshot(self, category: str) -> None:
+        """Synchronize startup context without inventing a focus transition."""
+        self._presence_app_category = category
+        self._logger.debug("[presence] context app=%s (baseline)", category)
+
     def _on_presence_app_category_changed(self, category: str) -> None:
         previous = self._presence_app_category
         self._presence_app_category = category
+        self._logger.debug("[presence] context app=%s -> %s", previous, category)
         if category != previous and category in ("terminal", "vscode"):
             self._on_user_active()
         if category == "vscode":
@@ -673,7 +724,10 @@ class PresenceBuddyMixin:
             self._vscode_coworking_active = True
             return GLib.SOURCE_REMOVE
 
-        if self._start_typing_emote():
+        if (
+            self._start_typing_emote()
+            and self.state.current is MochiState.TYPING
+        ):
             self._vscode_coworking_active = True
             self._logger.debug("VS Code coworking mode started")
         return GLib.SOURCE_REMOVE
@@ -696,7 +750,7 @@ class PresenceBuddyMixin:
             or self._user_idle
             or self.state.current is not MochiState.IDLE
             or self._context_menu_open
-            or self.player.animation is not ANIMATIONS["idle"]
+            or not self._is_idle_visual_active()
         ):
             return False
         if not self._start_typing_emote():
@@ -755,9 +809,20 @@ class PresenceBuddyMixin:
         action = self._ambient_presence_engine.evaluate(context, now=now)
         if action is None or self._presence_bubble is None:
             return GLib.SOURCE_CONTINUE
+        if not self._focus_allows_presence_action(action):
+            self._logger.debug(
+                "[presence] action suppressed by active focus: category=%s priority=%d",
+                action.category,
+                action.priority,
+            )
+            return GLib.SOURCE_CONTINUE
         if self._show_presence_action(action):
             self._ambient_presence_engine.record_delivered(action, now=now)
         return GLib.SOURCE_CONTINUE
+
+    def _focus_allows_presence_action(self, _action) -> bool:
+        """Extension seam for Focus With Mochi without changing AmbiSense rules."""
+        return True
 
     def _show_presence_action(self, action) -> bool:
         options = {"markup": INTRO_MARKUP} if action.event == "intro" else {}
@@ -789,6 +854,9 @@ class PresenceBuddyMixin:
         if self._presence_shutting_down:
             return
         self._presence_shutting_down = True
+        autonomous_sleep = getattr(self, "_autonomous_sleep", None)
+        if autonomous_sleep is not None:
+            autonomous_sleep.stop()
         source_id = self._presence_source_id
         self._presence_source_id = None
         if source_id is not None:
@@ -798,6 +866,13 @@ class PresenceBuddyMixin:
                 pass
         self._cancel_vscode_cowork_source()
         self._vscode_coworking_active = False
+        startup_wave_source_id = self._presence_startup_wave_source_id
+        self._presence_startup_wave_source_id = None
+        if startup_wave_source_id is not None:
+            try:
+                GLib.source_remove(startup_wave_source_id)
+            except Exception:
+                pass
         startup_source_id = self._presence_startup_source_id
         self._presence_startup_source_id = None
         if startup_source_id is not None:

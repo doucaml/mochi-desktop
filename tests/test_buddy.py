@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from mochi.animation import Animation
 from mochi.buddy import Buddy
@@ -159,6 +159,38 @@ class BuddyDragReleaseTests(unittest.TestCase):
         buddy._config.save_position.assert_called_once_with((10, 20))
 
 
+class BuddyBlinkTests(unittest.TestCase):
+    def test_blink_owns_behavior_state_until_idle_visual_resumes(self) -> None:
+        player = SimpleNamespace(frame_index=0, elapsed_ms=25, play=Mock())
+        buddy = SimpleNamespace(
+            DOUBLE_BLINK_CHANCE=Buddy.DOUBLE_BLINK_CHANCE,
+            player=player,
+            _transition_to=Mock(return_value=True),
+            _idle_resume_position=None,
+            _current_animation="idle",
+            _active_animation=ANIMATIONS["idle"],
+            _pending_animation=None,
+            _logger=Mock(),
+            queue_draw=Mock(),
+            _animation_for=Mock(return_value=ANIMATIONS["idle"]),
+            _maybe_resume_ambient_activity=Mock(),
+        )
+
+        with patch("mochi.buddy.random.random", return_value=1.0):
+            Buddy._play_blink(buddy)
+
+        buddy._transition_to.assert_called_once_with(MochiState.BLINKING)
+        self.assertEqual(buddy._current_animation, "blink")
+
+        Buddy._resume_idle(buddy)
+
+        self.assertEqual(
+            buddy._transition_to.call_args_list,
+            [call(MochiState.BLINKING), call(MochiState.IDLE)],
+        )
+        self.assertEqual(buddy._current_animation, "idle")
+
+
 class BuddyContextMenuTests(unittest.TestCase):
     def test_context_menu_opens_immediately_on_secondary_button_press(self) -> None:
         import inspect
@@ -263,12 +295,17 @@ class BuddyContextMenuTests(unittest.TestCase):
             _context_menu_animated_rows=(),
             _animate_menu_open=Mock(),
             _logger=Mock(),
+            get_width=lambda: 128,
+            get_height=lambda: 128,
         )
 
         Buddy._show_context_menu(buddy, None, 1, 12.0, 18.0)
 
         sound.play.assert_called_once_with(SoundEvent.MENU_OPEN)
         menu.popup.assert_called_once()
+        anchor = menu.set_pointing_to.call_args.args[0]
+        self.assertEqual((anchor.x, anchor.y), (0, 0))
+        self.assertEqual((anchor.width, anchor.height), (128, 128))
         buddy._cancel_hover_heart.assert_called_once_with()
         buddy._mark_interaction.assert_not_called()
         buddy._cancel_active_emote.assert_not_called()
@@ -413,6 +450,7 @@ class BuddyEmoteTests(unittest.TestCase):
             _tuning=SimpleNamespace(hover_heart_cooldown_seconds=2.0),
             _transition_to=Mock(return_value=True),
             _play_animation=Mock(),
+            _is_idle_visual_active=Mock(return_value=True),
         )
 
         with patch("mochi.ambient_activity.time.monotonic", return_value=10.0):
@@ -431,6 +469,7 @@ class BuddyEmoteTests(unittest.TestCase):
             _transition_to=Mock(return_value=True),
             _computer_idle_source_id=None,
             _play_animation=Mock(),
+            _is_idle_visual_active=Mock(return_value=True),
         )
 
         self.assertTrue(Buddy._start_computer_emote(buddy))
@@ -532,6 +571,7 @@ class BuddyTypingTests(unittest.TestCase):
             _computer_idle_source_id=None,
             _play_animation=Mock(),
             _logger=Mock(),
+            _is_idle_visual_active=Mock(return_value=True),
         )
 
         self.assertTrue(Buddy._start_typing_emote(buddy))
@@ -619,6 +659,7 @@ class BuddyWatchingTests(unittest.TestCase):
             _computer_idle_source_id=None,
             _play_animation=Mock(),
             _logger=Mock(),
+            _is_idle_visual_active=Mock(return_value=True),
         )
 
         self.assertTrue(Buddy._start_watching_emote(buddy))
@@ -703,6 +744,7 @@ class BuddySearchingTests(unittest.TestCase):
             _computer_idle_source_id=None,
             _play_animation=Mock(),
             _logger=Mock(),
+            _is_idle_visual_active=Mock(return_value=True),
         )
 
         self.assertTrue(Buddy._start_searching_emote(buddy))

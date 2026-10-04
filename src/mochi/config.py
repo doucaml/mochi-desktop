@@ -7,8 +7,10 @@ import json
 import logging
 import os
 from pathlib import Path
+from uuid import uuid4
 
 from mochi.care import BondState
+from mochi.update.constants import DEFAULT_UPDATE_CHANNEL, UPDATE_CHANNELS
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,65 @@ class ConfigStore:
         self._save(data)
         self._logger.debug("Edge roam: %s", bool(enabled))
 
+
+    def load_update_checks_enabled(self) -> bool:
+        try:
+            enabled = self._load()["update_checks_enabled"]
+        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return True
+        return enabled if isinstance(enabled, bool) else True
+
+    def save_update_checks_enabled(self, enabled: bool) -> None:
+        data = self._load_or_empty()
+        data["update_checks_enabled"] = bool(enabled)
+        self._save(data)
+
+    def load_update_channel(self) -> str:
+        try:
+            channel = self._load()["update_channel"]
+        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return DEFAULT_UPDATE_CHANNEL
+        return channel if channel in UPDATE_CHANNELS else DEFAULT_UPDATE_CHANNEL
+
+    def save_update_channel(self, channel: str) -> None:
+        if channel not in UPDATE_CHANNELS:
+            raise ValueError(f"unknown update channel: {channel!r}")
+        data = self._load_or_empty()
+        data["update_channel"] = channel
+        self._save(data)
+
+    def load_last_update_check(self) -> float | None:
+        try:
+            value = self._load()["last_update_check"]
+        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+
+    def save_last_update_check(self, timestamp: float) -> None:
+        data = self._load_or_empty()
+        data["last_update_check"] = float(timestamp)
+        self._save(data)
+
+    def load_dismissed_update_commit(self) -> str | None:
+        try:
+            value = self._load()["dismissed_update_commit"]
+        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+        if not isinstance(value, str):
+            return None
+        value = value.strip()
+        return value or None
+
+    def save_dismissed_update_commit(self, commit: str | None) -> None:
+        data = self._load_or_empty()
+        if commit is None or not str(commit).strip():
+            data.pop("dismissed_update_commit", None)
+        else:
+            data["dismissed_update_commit"] = str(commit).strip()
+        self._save(data)
+
     def load_bond_state(self) -> BondState:
         """Return Mochi's persisted, non-decaying bond progress."""
         try:
@@ -201,8 +262,8 @@ class ConfigStore:
             self._logger.info("Saved Mochi position reset")
         except FileNotFoundError:
             pass
-        except (TypeError, ValueError, json.JSONDecodeError):
-            self.path.unlink(missing_ok=True)
+        except (TypeError, ValueError) as error:
+            self._preserve_corrupt_config(error)
 
     def _load(self) -> dict[str, object]:
         data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -213,8 +274,31 @@ class ConfigStore:
     def _load_or_empty(self) -> dict[str, object]:
         try:
             return self._load()
-        except (FileNotFoundError, TypeError, ValueError, json.JSONDecodeError):
+        except FileNotFoundError:
             return {}
+        except (TypeError, ValueError) as error:
+            self._preserve_corrupt_config(error)
+            return {}
+
+    def _preserve_corrupt_config(self, error: Exception) -> None:
+        """Move unreadable JSON aside before a caller replaces the config."""
+        backup_path = self.path.with_name(
+            f"{self.path.name}.corrupt-{uuid4().hex}"
+        )
+        while backup_path.exists():
+            backup_path = self.path.with_name(
+                f"{self.path.name}.corrupt-{uuid4().hex}"
+            )
+        try:
+            self.path.replace(backup_path)
+        except FileNotFoundError:
+            return
+        self._logger.warning(
+            "Invalid config %s preserved as %s: %s",
+            self.path,
+            backup_path,
+            error,
+        )
 
     def _save(self, data: dict[str, object]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

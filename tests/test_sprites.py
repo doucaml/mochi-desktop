@@ -1,4 +1,6 @@
 import hashlib
+from pathlib import Path
+import tomllib
 import unittest
 
 import cairo
@@ -37,10 +39,14 @@ class SpriteDefinitionsTests(unittest.TestCase):
     def test_required_visible_states_use_manifest_art(self) -> None:
         required = {
             "default", "idle", "blink", "walk", "walk_left", "bounce",
+            "sad_idle",
             "squish", "sleep", "sleeping", "wake", "dragged", "excited",
             "heart", "computer", "computer_intro", "computer_typing",
             "computer_outro", "typing_intro", "typing_loop", "typing_outro",
+            "focus_start", "focus_loop", "focus_stop",
+            "focus_thinking_start", "focus_thinking_loop", "focus_thinking_end",
             "watch", "dance", "searching", "drop", "side_eye", "table_flip",
+            "this_is_fine", "wave", "coffee", "vs_code", "mochi_exe", "level_up_default",
         }
         self.assertTrue(required.issubset(ANIMATIONS))
 
@@ -54,6 +60,146 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertEqual(len(pickup.frames), 6)
         self.assertEqual(pickup.frame_duration_ms, PICKUP_FRAME_DURATION_MS)
         self.assertFalse(pickup.looping)
+
+    def test_pocket_grab_is_an_eight_frame_one_shot(self) -> None:
+        pocket_grab = ANIMATIONS["pocket_grab"]
+
+        self.assertEqual(len(pocket_grab.frames), 8)
+        self.assertEqual(pocket_grab.frame_duration_ms, 120)
+        self.assertFalse(pocket_grab.looping)
+        self.assertEqual(
+            set(ASSET_SET.load_frames("pocket_grab")),
+            {
+                f"pocket_grab/mochi_pocket_grab_{index:04}.png"
+                for index in range(1, 9)
+            },
+        )
+
+    def test_pocket_hover_loops_the_open_mouth_middle_frames(self) -> None:
+        hover = ANIMATIONS["pocket_hover"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in hover.frames),
+            tuple(
+                f"pocket_grab/mochi_pocket_grab_{index:04}.png"
+                for index in (4, 5, 6, 7, 6, 5)
+            ),
+        )
+        self.assertEqual(hover.frame_duration_ms, 120)
+        self.assertTrue(hover.looping)
+        self.assertIsNone(hover.next_state)
+
+    def test_pocket_finish_closes_without_restarting_the_full_animation(self) -> None:
+        finish = ANIMATIONS["pocket_finish"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in finish.frames),
+            (
+                "pocket_grab/mochi_pocket_grab_0007.png",
+                "pocket_grab/mochi_pocket_grab_0008.png",
+            ),
+        )
+        self.assertEqual(finish.frame_duration_ms, 120)
+        self.assertFalse(finish.looping)
+        self.assertEqual(finish.next_state, "idle")
+
+    def test_pocket_glow_paints_a_translucent_effect_for_the_current_frame(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        context = cairo.Context(surface)
+
+        atlas.draw_glow(context, frame, 256, 256, pulse=0.5)
+        surface.flush()
+
+        self.assertTrue(any(bytes(surface.get_data())))
+
+    def test_pocket_glow_breathes_brighter_and_wider_at_peak_pulse(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+
+        low = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        atlas.draw_glow(cairo.Context(low), frame, 256, 256, pulse=0.0)
+        low.flush()
+
+        high = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        atlas.draw_glow(cairo.Context(high), frame, 256, 256, pulse=1.0)
+        high.flush()
+
+        self.assertGreater(
+            sum(bytes(high.get_data())),
+            sum(bytes(low.get_data())),
+        )
+
+
+    def test_pocket_glow_is_fully_transparent_before_small_widget_edges(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        size = 112
+        margin = 8
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+
+        atlas.draw_glow(cairo.Context(surface), frame, size, size, pulse=1.0)
+        surface.flush()
+
+        data = bytes(surface.get_data())
+        stride = surface.get_stride()
+        self.assertTrue(any(data))
+
+        for y in range(size):
+            row = data[y * stride : (y + 1) * stride]
+            if y < margin or y >= size - margin:
+                self.assertFalse(any(row))
+                continue
+            self.assertFalse(any(row[: margin * 4]))
+            self.assertFalse(any(row[(size - margin) * 4 : size * 4]))
+
+
+    def test_pocket_glow_remains_visible_around_transparent_sprite_pixels(self) -> None:
+        atlas = SpriteAtlas()
+        frame = ANIMATIONS["pocket_hover"].frames[0]
+        size = 112
+
+        glow = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        atlas.draw_glow(cairo.Context(glow), frame, size, size, pulse=1.0)
+        glow.flush()
+
+        sprite = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        atlas.draw(cairo.Context(sprite), frame, size, size)
+        sprite.flush()
+
+        glow_data = bytes(glow.get_data())
+        sprite_data = bytes(sprite.get_data())
+        glow_stride = glow.get_stride()
+        sprite_stride = sprite.get_stride()
+
+        visible_halo_pixel = False
+        for py in range(size):
+            for px in range(size):
+                glow_pixel = glow_data[
+                    py * glow_stride + px * 4 : py * glow_stride + (px + 1) * 4
+                ]
+                sprite_pixel = sprite_data[
+                    py * sprite_stride + px * 4 : py * sprite_stride + (px + 1) * 4
+                ]
+                if any(glow_pixel) and not any(sprite_pixel):
+                    visible_halo_pixel = True
+                    break
+            if visible_halo_pixel:
+                break
+
+        self.assertTrue(visible_halo_pixel)
+
+    def test_pocket_frames_are_included_in_installed_package_data(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        with (project_root / "pyproject.toml").open("rb") as stream:
+            pyproject = tomllib.load(stream)
+
+        data_files = pyproject["tool"]["setuptools"]["data-files"]
+        self.assertEqual(
+            data_files["share/mochi/pocket_grab"],
+            ["assets/mochi/pocket_grab/*.png"],
+        )
 
     def test_drop_is_a_quick_six_frame_one_shot(self) -> None:
         drop = ANIMATIONS["drop"]
@@ -81,10 +227,38 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertEqual(len(idle.frames), 6)
         self.assertEqual(
             tuple(frame.duration_ms for frame in idle.frames),
-            (750, 500, 350, 900, 400, 1_000),
+            (900, 600, 450, 1_100, 500, 1_400),
         )
-        self.assertEqual(sum(frame.duration_ms or 0 for frame in idle.frames), 3900)
+        self.assertEqual(sum(frame.duration_ms or 0 for frame in idle.frames), 4950)
         self.assertTrue(idle.looping)
+
+    def test_sad_idle_uses_six_128px_frames_at_a_slow_breathing_cadence(
+        self,
+    ) -> None:
+        sad_idle = ANIMATIONS["sad_idle"]
+        metadata = ASSET_SET.animations["sad_idle"]
+
+        self.assertEqual(
+            tuple(frame.sprite for frame in sad_idle.frames),
+            tuple(f"sad_idle/sad_idle_{index:02}.png" for index in range(1, 7)),
+        )
+        self.assertEqual(sad_idle.frame_duration_ms, 500)
+        self.assertTrue(sad_idle.looping)
+        self.assertEqual(metadata.source_cell_size, (128, 128))
+
+        loaded = ASSET_SET.load_frames("sad_idle")
+        self.assertTrue(
+            all(
+                (surface.get_width(), surface.get_height()) == (256, 256)
+                for surface in loaded.values()
+            )
+        )
+
+        atlas = SpriteAtlas()
+        self.assertEqual(
+            atlas._source_visible_bounds(sad_idle.frames[0].sprite),
+            atlas._source_visible_bounds(ANIMATIONS["idle"].frames[0].sprite),
+        )
 
     def test_blink_uses_fast_per_frame_timing(self) -> None:
         blink = ANIMATIONS["blink"]
@@ -178,6 +352,66 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertEqual(heart.frame_duration_ms, 120)
         self.assertFalse(heart.looping)
 
+    def test_coffee_preserves_the_authored_one_shot_timing(self) -> None:
+        coffee = ANIMATIONS["coffee"]
+        metadata = ASSET_SET.animations["coffee"]
+
+        self.assertEqual(len(coffee.frames), 21)
+        self.assertEqual(coffee.frame_duration_ms, 120)
+        self.assertFalse(coffee.looping)
+        self.assertEqual(coffee.next_state, "idle")
+        self.assertEqual(metadata.source_cell_size, (256, 256))
+        self.assertEqual(
+            tuple(frame.sprite for frame in coffee.frames),
+            tuple(
+                f"coffee/mochi_coffee_{index:04}.png"
+                for index in range(1, 22)
+            ),
+        )
+
+    def test_this_is_fine_preserves_authored_one_shot_timing(self) -> None:
+        emote = ANIMATIONS["this_is_fine"]
+        metadata = ASSET_SET.animations["this_is_fine"]
+
+        self.assertEqual(len(emote.frames), 16)
+        self.assertEqual(emote.frame_duration_ms, 120)
+        self.assertFalse(emote.looping)
+        self.assertEqual(metadata.spritesheet_path, "this_is_fine/this_is_fine.png")
+        self.assertEqual(metadata.source_cell_size, (256, 256))
+        self.assertEqual(len(metadata.frame_paths), 16)
+
+    def test_this_is_fine_asset_is_included_in_installed_builds(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        with (project_root / "pyproject.toml").open("rb") as stream:
+            pyproject = tomllib.load(stream)
+
+        data_files = pyproject["tool"]["setuptools"]["data-files"]
+        self.assertEqual(
+            data_files["share/mochi/this_is_fine"],
+            ["assets/mochi/this_is_fine/*.png"],
+        )
+
+    def test_coffee_assets_are_included_in_installed_builds(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        with (project_root / "pyproject.toml").open("rb") as stream:
+            pyproject = tomllib.load(stream)
+
+        data_files = pyproject["tool"]["setuptools"]["data-files"]
+        self.assertEqual(
+            data_files["share/mochi/coffee"],
+            ["assets/mochi/coffee/*.png"],
+        )
+
+    def test_level_up_default_preserves_authored_64px_spritesheet(self) -> None:
+        level_up = ANIMATIONS["level_up_default"]
+        metadata = ASSET_SET.animations["level_up_default"]
+
+        self.assertEqual(len(level_up.frames), 16)
+        self.assertEqual(level_up.frame_duration_ms, 120)
+        self.assertFalse(level_up.looping)
+        self.assertEqual(metadata.spritesheet_path, "level_up_default/level_up_default.png")
+        self.assertEqual(metadata.source_cell_size, (64, 64))
+
     def test_computer_emote_has_intro_typing_and_outro_phases(self) -> None:
         self.assertEqual(len(ANIMATIONS["computer_intro"].frames), 4)
         self.assertEqual(len(ANIMATIONS["computer_typing"].frames), 8)
@@ -185,6 +419,36 @@ class SpriteDefinitionsTests(unittest.TestCase):
         self.assertFalse(ANIMATIONS["computer_intro"].looping)
         self.assertTrue(ANIMATIONS["computer_typing"].looping)
         self.assertFalse(ANIMATIONS["computer_outro"].looping)
+
+    def test_focus_animation_has_authored_start_loop_and_stop_phases(self) -> None:
+        start = ANIMATIONS["focus_start"]
+        loop = ANIMATIONS["focus_loop"]
+        stop = ANIMATIONS["focus_stop"]
+
+        self.assertEqual(len(start.frames), 4)
+        self.assertEqual(start.frame_duration_ms, 120)
+        self.assertFalse(start.looping)
+        self.assertEqual(len(loop.frames), 24)
+        self.assertEqual(loop.frame_duration_ms, 140)
+        self.assertTrue(loop.looping)
+        self.assertEqual(len(stop.frames), 4)
+        self.assertEqual(stop.frame_duration_ms, 120)
+        self.assertFalse(stop.looping)
+
+    def test_focus_thinking_animation_has_start_loop_and_end_phases(self) -> None:
+        start = ANIMATIONS["focus_thinking_start"]
+        loop = ANIMATIONS["focus_thinking_loop"]
+        end = ANIMATIONS["focus_thinking_end"]
+
+        self.assertEqual(len(start.frames), 5)
+        self.assertEqual(start.frame_duration_ms, 140)
+        self.assertFalse(start.looping)
+        self.assertEqual(len(loop.frames), 8)
+        self.assertEqual(loop.frame_duration_ms, 140)
+        self.assertTrue(loop.looping)
+        self.assertEqual(len(end.frames), 5)
+        self.assertEqual(end.frame_duration_ms, 140)
+        self.assertFalse(end.looping)
 
     def test_searching_emote_preserves_the_authored_twenty_frame_timing(self) -> None:
         searching = ANIMATIONS["searching"]
@@ -229,3 +493,22 @@ def test_bond_idle_emotes_use_authored_64px_spritesheets() -> None:
     assert table_flip.spritesheet_path == "table_flip/table_flip.png"
     assert table_flip.source_cell_size == (64, 64)
     assert len(table_flip.frame_paths) == 16
+
+def test_new_catalogue_emotes_preserve_authored_64px_spritesheets() -> None:
+    expected = {
+        "wave": ("wave/wave.png", 8, 120),
+        "vs_code": ("vs_code/vs_code.png", 14, 240),
+        "mochi_exe": ("mochi_exe/mochi_exe.png", 16, 120),
+    }
+
+    for animation_name, (sheet_path, frame_count, duration_ms) in expected.items():
+        animation = ANIMATIONS[animation_name]
+        metadata = ASSET_SET.animations[animation_name]
+
+        assert len(animation.frames) == frame_count
+        assert animation.frame_duration_ms == duration_ms
+        assert animation.looping is False
+        assert animation.next_state == "idle"
+        assert metadata.spritesheet_path == sheet_path
+        assert metadata.source_cell_size == (64, 64)
+        assert len(metadata.frame_paths) == frame_count

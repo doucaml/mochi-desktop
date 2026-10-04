@@ -7,10 +7,10 @@ never participates in input handling. Mochi's own gestures/controllers
 remain the single source of truth for clicks, drags, and the context menu.
 
 A previous status-overlay experiment (`Gtk.Popover` with its own click/hover/
-key controllers, focus grabs, and autohide) fought with Mochi's context menu
-popover for input/focus grabs and caused freezes. This module intentionally
-carries none of that: no gestures, no focus, no autohide, no keyboard
-handling -- just position + text.
+key controllers, focus grabs, and GTK autohide) fought with Mochi's context
+menu popover for input/focus grabs and caused freezes. This module intentionally
+carries none of that: no gestures, no focus, no GTK autohide, no keyboard
+handling -- just position, text, and controller-driven visual opacity.
 """
 
 from __future__ import annotations
@@ -149,6 +149,13 @@ class Nameplate:
         if self._popover.get_visible():
             self._popover.popdown()
         self._mode = None
+
+    def set_opacity(self, opacity: float) -> None:
+        """Apply visual opacity without adding input/focus behavior."""
+
+        value = min(1.0, max(0.0, float(opacity)))
+        self._window.set_opacity(value)
+        self._popover.set_opacity(value)
 
     def set_name(self, name: str) -> None:
         self._name = name.strip() or "Mochi"
@@ -355,8 +362,8 @@ class Nameplate:
                 background: transparent;
             }
             .mochi-nameplate-text {
-                background: alpha(@window_bg_color, 0.96);
-                color: @window_fg_color;
+                background: alpha(@theme_bg_color, 0.96);
+                color: @theme_fg_color;
                 border: 1px solid alpha(#79c98b, 0.30);
                 border-radius: 999px;
                 box-shadow: 0 5px 16px alpha(black, 0.14);
@@ -371,7 +378,7 @@ class Nameplate:
                 padding: 0;
             }
             popover.mochi-nameplate-popover > arrow {
-                background: alpha(@window_bg_color, 0.96);
+                background: alpha(@theme_bg_color, 0.96);
                 border-color: alpha(#79c98b, 0.30);
             }
             """

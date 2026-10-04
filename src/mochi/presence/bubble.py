@@ -16,6 +16,12 @@ from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 from mochi.x11 import get_window_position, move_window, request_keep_above
 
 
+def _disable_focus_tree(widget: Gtk.Widget) -> None:
+    """Keep passive presentation surfaces out of GTK keyboard focus."""
+    widget.set_focusable(False)
+    widget.set_can_focus(False)
+
+
 class SpeechBubble:
     """Show one subtle bubble anchored to Mochi without stealing keyboard focus.
 
@@ -24,7 +30,7 @@ class SpeechBubble:
     Wayland falls back to a Gtk.Popover anchored to the Buddy widget.
     """
 
-    FOLLOW_INTERVAL_MS = 33
+    FOLLOW_INTERVAL_MS = 22
     FADE_IN_SECONDS = 0.20
     FADE_OUT_SECONDS = 0.26
     GAP_PX = 8
@@ -63,7 +69,7 @@ class SpeechBubble:
         self._window.set_decorated(False)
         self._window.set_resizable(False)
         self._window.set_modal(False)
-        self._window.set_focusable(False)
+        _disable_focus_tree(self._window)
         self._window.set_hide_on_close(True)
         self._window.set_transient_for(owner)
         self._window.add_css_class("mochi-speech-window")
@@ -80,7 +86,7 @@ class SpeechBubble:
         self._popover.set_has_arrow(True)
         self._popover.set_position(Gtk.PositionType.TOP)
         self._popover.set_offset(0, -self.GAP_PX)
-        self._popover.set_focusable(False)
+        _disable_focus_tree(self._popover)
         self._popover.set_can_target(False)
         self._popover.add_css_class("mochi-speech-popover")
         self._popover.set_child(self._popover_box)
@@ -550,8 +556,8 @@ class SpeechBubble:
                 background: transparent;
             }
             .mochi-speech-bubble {
-                background: alpha(@window_bg_color, 0.96);
-                color: @window_fg_color;
+                background: alpha(@theme_bg_color, 0.96);
+                color: @theme_fg_color;
                 border: 1px solid alpha(#79c98b, 0.30);
                 border-radius: 999px;
                 box-shadow: 0 5px 16px alpha(black, 0.14);
@@ -568,7 +574,7 @@ class SpeechBubble:
                 font-weight: 500;
             }
             .mochi-speech-text.mochi-speech-typing {
-                color: alpha(@window_fg_color, 0.62);
+                color: alpha(@theme_fg_color, 0.62);
                 font-style: italic;
             }
             popover.mochi-speech-popover > contents {
@@ -578,7 +584,7 @@ class SpeechBubble:
                 padding: 0;
             }
             popover.mochi-speech-popover > arrow {
-                background: alpha(@window_bg_color, 0.96);
+                background: alpha(@theme_bg_color, 0.96);
                 border-color: alpha(#79c98b, 0.30);
             }
             """

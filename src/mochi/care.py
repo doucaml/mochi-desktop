@@ -3,15 +3,46 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import math
 
 
 BOND_BASE_XP = 480
 BOND_LEVEL_GROWTH_XP = 90
 BOND_TYPING_XP_PER_SECOND = 1
-BOND_FEED_XP = 60
+BOND_FEED_FIRST_XP = 30
+BOND_FEED_SECOND_XP = 10
+BOND_FEED_REWARD_WINDOW_SECONDS = 10 * 60
 DEFAULT_BOND_LEVEL = 1
 DEFAULT_BOND_XP = 0
+
+
+class BondPhase(Enum):
+    """Relationship familiarity derived from persisted bond level."""
+
+    NEW = "new"
+    FAMILIAR = "familiar"
+    COMFORTABLE = "comfortable"
+    CLOSE = "close"
+    DEEP_BOND = "deep_bond"
+
+
+def bond_phase_for_level(level: object) -> BondPhase:
+    """Return the non-regressive relationship phase for a bond level.
+
+    Invalid and low values deliberately resolve to the new/curious phase, the
+    same safe baseline used by :class:`BondState`.
+    """
+    normalized = max(DEFAULT_BOND_LEVEL, _coerce_int(level, DEFAULT_BOND_LEVEL))
+    if normalized <= 2:
+        return BondPhase.NEW
+    if normalized <= 4:
+        return BondPhase.FAMILIAR
+    if normalized <= 7:
+        return BondPhase.COMFORTABLE
+    if normalized <= 10:
+        return BondPhase.CLOSE
+    return BondPhase.DEEP_BOND
 
 
 def _coerce_int(value: object, default: int) -> int:
@@ -19,6 +50,21 @@ def _coerce_int(value: object, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def bond_feed_reward_xp(completed_feeds_in_window: int) -> int:
+    """Return bond XP for the next feed in the current reward window.
+
+    Feeding stays available for character interaction, but only the first two
+    completed feeds after ten minutes of feed inactivity award bond XP.
+    """
+
+    completed = max(0, _coerce_int(completed_feeds_in_window, 0))
+    if completed == 0:
+        return BOND_FEED_FIRST_XP
+    if completed == 1:
+        return BOND_FEED_SECOND_XP
+    return 0
 
 
 def bond_xp_required(level: int) -> int:

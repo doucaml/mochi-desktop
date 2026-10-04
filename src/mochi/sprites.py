@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import math
 import sys
 
 import cairo
@@ -38,7 +39,7 @@ ANIMATIONS["computer_outro"] = replace(
     ANIMATIONS["computer"], name="computer_outro", frames=computer_frames[12:]
 )
 idle_frames = ANIMATIONS["idle"].frames
-idle_durations = (750, 500, 350, 900, 400, 1_000)
+idle_durations = (900, 600, 450, 1_100, 500, 1_400)
 idle_cycle = tuple(
     replace(frame, duration_ms=duration)
     for frame, duration in zip(idle_frames, idle_durations, strict=True)
@@ -118,6 +119,21 @@ ANIMATIONS["table_flip"] = replace(
     ),
 )
 ANIMATIONS["excited"] = replace(ANIMATIONS["bounce"], name="excited")
+pocket_grab_frames = ANIMATIONS["pocket_grab"].frames
+ANIMATIONS["pocket_hover"] = replace(
+    ANIMATIONS["pocket_grab"],
+    name="pocket_hover",
+    frames=tuple(pocket_grab_frames[index - 1] for index in (4, 5, 6, 7, 6, 5)),
+    looping=True,
+    next_state=None,
+)
+ANIMATIONS["pocket_finish"] = replace(
+    ANIMATIONS["pocket_grab"],
+    name="pocket_finish",
+    frames=(pocket_grab_frames[6], pocket_grab_frames[7]),
+    looping=False,
+    next_state="idle",
+)
 
 
 class SpriteAtlas:
@@ -153,6 +169,93 @@ class SpriteAtlas:
         context.set_source_surface(sprite, 0, 0)
         context.get_source().set_filter(cairo.FILTER_NEAREST)
         context.paint()
+        context.restore()
+
+    def draw_glow(
+        self,
+        context: cairo.Context,
+        frame: AnimationFrame,
+        width: int,
+        height: int,
+        *,
+        pulse: float = 0.5,
+    ) -> None:
+        """Paint a soft breathing Pocket acceptance glow around the sprite."""
+        pulse = max(0.0, min(1.0, float(pulse)))
+        x, y, visible_width, visible_height = self.visible_bounds(
+            frame,
+            width,
+            height,
+        )
+        center_x = x + visible_width / 2
+        center_y = y + visible_height / 2
+
+        # Keep the aura comfortably inside the transparent Buddy canvas so
+        # GTK never clips a visible pixel into a square edge.
+        edge_margin = 10.0
+        max_radius_x = max(
+            1.0,
+            min(center_x, width - center_x) - edge_margin,
+        )
+        max_radius_y = max(
+            1.0,
+            min(center_y, height - center_y) - edge_margin,
+        )
+
+        # The halo must extend beyond Mochi's opaque body. Base the radius on
+        # half the visible sprite size plus a small exterior halo, rather than
+        # shrinking the whole gradient inside the sprite bounds.
+        half_width = visible_width / 2
+        half_height = visible_height / 2
+        halo_x = min(10.0, max(5.0, visible_width * 0.11))
+        halo_y = min(10.0, max(5.0, visible_height * 0.11))
+        pulse_scale = 0.88 + 0.12 * pulse
+        desired_radius_x = half_width + halo_x * pulse_scale
+        desired_radius_y = half_height + halo_y * pulse_scale
+        radius_x = min(max_radius_x, max(1.0, desired_radius_x))
+        radius_y = min(max_radius_y, max(1.0, desired_radius_y))
+        outer_alpha = 0.22 + 0.10 * pulse
+        inner_alpha = 0.23 + 0.10 * pulse
+
+        context.save()
+        context.translate(center_x, center_y)
+        context.scale(radius_x, radius_y)
+
+        outer = cairo.RadialGradient(0.0, 0.0, 0.06, 0.0, 0.0, 1.0)
+        outer.add_color_stop_rgba(0.0, 0.475, 0.788, 0.545, outer_alpha)
+        outer.add_color_stop_rgba(
+            0.55,
+            0.475,
+            0.788,
+            0.545,
+            outer_alpha * 0.62,
+        )
+        outer.add_color_stop_rgba(
+            0.84,
+            0.475,
+            0.788,
+            0.545,
+            outer_alpha * 0.24,
+        )
+        outer.add_color_stop_rgba(1.0, 0.475, 0.788, 0.545, 0.0)
+        context.set_source(outer)
+        context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
+        context.fill()
+
+        context.scale(0.66, 0.66)
+        inner = cairo.RadialGradient(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        inner.add_color_stop_rgba(0.0, 0.56, 0.88, 0.63, inner_alpha)
+        inner.add_color_stop_rgba(
+            0.62,
+            0.56,
+            0.88,
+            0.63,
+            inner_alpha * 0.30,
+        )
+        inner.add_color_stop_rgba(1.0, 0.56, 0.88, 0.63, 0.0)
+        context.set_source(inner)
+        context.arc(0.0, 0.0, 1.0, 0.0, math.tau)
+        context.fill()
         context.restore()
 
     def visible_bounds(

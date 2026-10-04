@@ -5,7 +5,10 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 from mochi.care import BondState
-from mochi.presence.bond_progress_overlay import BondProgressOverlay
+from mochi.presence.bond_progress_overlay import (
+    LEVEL_UP_REACTION_LINE,
+    BondProgressOverlay,
+)
 
 
 def _overlay_harness() -> BondProgressOverlay:
@@ -84,6 +87,27 @@ def test_xp_gain_keeps_hud_text_quiet_and_schedules_brief_highlight() -> None:
     assert overlay._gain_source_id == 91
 
 
+def test_repeated_xp_gains_keep_one_owned_flash_timer() -> None:
+    overlay = _overlay_harness()
+    overlay.resume = Mock()
+
+    with patch(
+        "mochi.presence.bond_progress_overlay.GLib.timeout_add",
+        side_effect=range(100, 200),
+    ) as timeout, patch(
+        "mochi.presence.bond_progress_overlay.GLib.source_remove"
+    ) as remove:
+        for xp in range(1, 101):
+            overlay.notify_xp_gain(BondState(level=1, xp=xp), 1)
+
+    assert timeout.call_count == 100
+    assert remove.call_count == 99
+    assert [entry.args[0] for entry in remove.call_args_list] == list(
+        range(100, 199)
+    )
+    assert overlay._gain_source_id == 199
+
+
 def test_level_up_switches_to_dedicated_celebration_card() -> None:
     overlay = _overlay_harness()
     overlay.resume = Mock()
@@ -97,6 +121,7 @@ def test_level_up_switches_to_dedicated_celebration_card() -> None:
     overlay._normal_content.set_visible.assert_called_with(False)
     overlay._level_up_content.set_visible.assert_called_with(True)
     overlay._level_up_level.set_text.assert_called_with("Bond Level 2")
+    overlay._level_up_subtitle.set_text.assert_called_with(LEVEL_UP_REACTION_LINE)
     assert overlay._activity == "typing together"
     assert overlay.level_up_active is True
 

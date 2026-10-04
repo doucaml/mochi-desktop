@@ -13,13 +13,20 @@ def test_presentation_state_has_distinct_emote_unlock_mode() -> None:
     assert PresentationState.EMOTE_UNLOCK is not PresentationState.LEVEL_UP
 
 
-def test_idle_selector_uses_bond_gated_emote_pool() -> None:
-    selector_source = inspect.getsource(Buddy._choose_idle_action)
-    pool_source = inspect.getsource(BondMeterMixin._available_idle_emote_animations)
+def test_idle_selector_uses_catalogue_driven_bond_pool() -> None:
+    selector_source = inspect.getsource(Buddy._choose_idle_action_with_walk)
+    player_source = inspect.getsource(Buddy._play_autonomous_catalogue_emote)
+    pool_source = inspect.getsource(
+        BondMeterMixin._available_catalogue_emote_animations
+    )
 
-    assert "_available_idle_emote_animations" in selector_source
-    assert "MochiState.IDLE_EMOTE" in selector_source
-    assert "unlocked_idle_animation_names" in pool_source
+    assert "_available_catalogue_emote_animations" in selector_source
+    assert "IDLE_CATALOGUE_EMOTE_CHANCE" in selector_source
+    assert "random.choice(unlocked_emotes)" in selector_source
+    assert "MochiState.IDLE_EMOTE" in player_source
+    assert "looping=False" in player_source
+    assert 'next_state="idle"' in player_source
+    assert "unlocked_emote_animation_names" in pool_source
     assert "_dev_unlock_all_emotes" in pool_source
 
 
@@ -31,11 +38,16 @@ def test_bond_level_up_queues_revealable_emotes() -> None:
     assert "_pending_emote_unlocks.extend" in source
 
 
-def test_level_up_completion_chains_into_unlock_card() -> None:
-    source = inspect.getsource(BondMeterMixin._on_bond_level_up_finished)
+def test_level_up_completion_starts_unlock_card_before_delayed_demo() -> None:
+    finish_source = inspect.getsource(BondMeterMixin._on_bond_level_up_finished)
+    queue_source = inspect.getsource(BondMeterMixin._show_next_emote_unlock_or_finish)
+    demo_source = inspect.getsource(BondMeterMixin._start_pending_emote_demo)
 
-    assert "PresentationState.EMOTE_UNLOCK" in source
-    assert "overlay.show_emote_unlock(emote)" in source
+    assert "PresentationState.EMOTE_UNLOCK" in finish_source
+    assert "overlay.show_emote_unlock(emote)" in queue_source
+    assert "EMOTE_UNLOCK_DEMO_DELAY_MS" in queue_source
+    assert "_play_bond_presentation_animation" in demo_source
+    assert 'stage="emote_demo"' in demo_source
 
 
 def test_developer_menu_has_session_only_unlock_all_action() -> None:

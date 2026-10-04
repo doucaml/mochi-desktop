@@ -18,6 +18,9 @@ from mochi.sprites import ANIMATIONS, SpriteAtlas
 from mochi.x11 import get_window_position, move_window, request_keep_above
 
 
+LEVEL_UP_REACTION_LINE = "we're closer now! 🌱"
+
+
 class EmoteUnlockPreview(Gtk.DrawingArea):
     """Static authored-frame preview used only by the unlock reward card."""
 
@@ -246,7 +249,10 @@ class BondProgressOverlay:
         level_up_level.add_css_class("mochi-level-up-level")
         celebration.append(level_up_level)
 
-        level_up_subtitle = Gtk.Label(label="Your bond grew stronger")
+        # This is Mochi's one-off reaction to a real milestone, not a recurring
+        # tier phrase bank. Keeping it in the existing presentation card makes
+        # the line readable without competing with the speech bubble surface.
+        level_up_subtitle = Gtk.Label(label=LEVEL_UP_REACTION_LINE)
         level_up_subtitle.set_halign(Gtk.Align.CENTER)
         level_up_subtitle.set_can_target(False)
         level_up_subtitle.add_css_class("mochi-level-up-subtitle")
@@ -331,7 +337,7 @@ class BondProgressOverlay:
         for label in (self._level_up_title, self._popover_level_up_title):
             label.set_text("✦  LEVEL UP!  ✦")
         for label in (self._level_up_subtitle, self._popover_level_up_subtitle):
-            label.set_text("Your bond grew stronger")
+            label.set_text(LEVEL_UP_REACTION_LINE)
         for preview in self._unlock_previews:
             preview.set_emote(None)
         self._set_level_up_content(True)
@@ -744,8 +750,8 @@ class BondProgressOverlay:
                 background: transparent;
             }
             .mochi-bond-card {
-                background: alpha(@window_bg_color, 0.97);
-                color: @window_fg_color;
+                background: alpha(@theme_bg_color, 0.97);
+                color: @theme_fg_color;
                 border: 1px solid alpha(#79c98b, 0.44);
                 border-radius: 11px;
                 box-shadow: 0 5px 18px alpha(black, 0.16);
@@ -756,7 +762,7 @@ class BondProgressOverlay:
                 box-shadow: 0 4px 16px alpha(#79c98b, 0.18);
             }
             .mochi-bond-card.mochi-bond-level-up {
-                background: alpha(@window_bg_color, 0.98);
+                background: alpha(@theme_bg_color, 0.98);
                 border: 2px solid alpha(#a8f2b4, 0.92);
                 border-radius: 14px;
                 box-shadow: 0 7px 24px alpha(#79c98b, 0.34);
@@ -779,7 +785,7 @@ class BondProgressOverlay:
                 margin-bottom: 2px;
             }
             .mochi-level-up-subtitle {
-                color: alpha(@window_fg_color, 0.68);
+                color: alpha(@theme_fg_color, 0.68);
                 font-size: 9px;
             }
             .mochi-bond-level {
@@ -790,7 +796,7 @@ class BondProgressOverlay:
                 font-weight: 800;
             }
             .mochi-bond-activity {
-                color: alpha(@window_fg_color, 0.62);
+                color: alpha(@theme_fg_color, 0.62);
                 font-size: 9px;
             }
             .mochi-bond-activity.mochi-bond-level-up {
@@ -798,7 +804,7 @@ class BondProgressOverlay:
                 font-weight: 800;
             }
             .mochi-bond-xp {
-                color: alpha(@window_fg_color, 0.62);
+                color: alpha(@theme_fg_color, 0.62);
                 font-size: 9px;
             }
             .mochi-bond-gain-text {
@@ -815,7 +821,7 @@ class BondProgressOverlay:
             progressbar.mochi-bond-progress trough {
                 min-height: 7px;
                 border-radius: 999px;
-                background: alpha(@window_fg_color, 0.12);
+                background: alpha(@theme_fg_color, 0.12);
             }
             progressbar.mochi-bond-progress progress {
                 min-height: 7px;
@@ -835,7 +841,7 @@ class BondProgressOverlay:
                 padding: 0;
             }
             popover.mochi-bond-popover > arrow {
-                background: alpha(@window_bg_color, 0.97);
+                background: alpha(@theme_bg_color, 0.97);
                 border-color: alpha(#79c98b, 0.44);
             }
             """

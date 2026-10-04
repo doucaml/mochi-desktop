@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import logging
 import os
+import signal
 import sys
 from collections.abc import MutableMapping
+from pathlib import Path
 
 from mochi.config import ConfigStore
 
@@ -23,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--reset-position",
         action="store_true",
         help="forget Mochi's saved position before starting",
+    )
+    parser.add_argument(
+        "--update-ready-file",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
     )
     return parser
 
@@ -45,6 +54,11 @@ def configure_display_backend(environment: MutableMapping[str, str]) -> bool:
     return True
 
 
+def enable_debug_stack_dumps() -> None:
+    """`kill -USR1 <pid>` prints every Python thread's stack to stderr."""
+    faulthandler.register(signal.SIGUSR1, all_threads=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     selected_xwayland = configure_display_backend(os.environ)
@@ -53,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(name)s: %(message)s",
     )
     if args.debug:
+        enable_debug_stack_dumps()
         logging.getLogger(__name__).debug(
             "Display environment: session_type=%r current_desktop=%r "
             "session_desktop=%r wayland_display=%r display=%r "
@@ -85,7 +100,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     application = MochiApplication(
-        config=config, preview_animations=args.preview_animations
+        config=config,
+        preview_animations=args.preview_animations,
+        update_ready_file=args.update_ready_file,
     )
     return application.run([sys.argv[0]])
 

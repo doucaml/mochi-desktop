@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, Gtk  # noqa: E402
 
+from mochi.color_scheme import SystemColorSchemeSync
 from mochi.config import ConfigStore
 from mochi.presence.click_dialogue import PresenceBuddy, PresenceX11Buddy
 from mochi.sound import SoundEvent, SoundManager
@@ -16,9 +18,20 @@ from mochi.windowing import WindowPlacement
 from mochi.x11 import request_keep_above
 
 
+def signal_update_ready(path: Path) -> None:
+    """Atomically report that the updated Mochi reached normal activation."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text("ready\n", encoding="utf-8")
+    temporary.replace(path)
+
+
 class MochiApplication(Gtk.Application):
     def __init__(
-        self, config: ConfigStore, preview_animations: bool = False
+        self,
+        config: ConfigStore,
+        preview_animations: bool = False,
+        update_ready_file: Path | None = None,
     ) -> None:
         super().__init__(
             application_id=(
@@ -30,8 +43,10 @@ class MochiApplication(Gtk.Application):
         )
         self.config = config
         self.preview_animations = preview_animations
+        self.update_ready_file = update_ready_file
         self._logger = logging.getLogger(__name__)
         self._buddy: PresenceBuddy | PresenceX11Buddy | None = None
+        self._color_scheme_sync: SystemColorSchemeSync | None = None
         self.sound = SoundManager(
             volume=config.load_volume(),
             muted=config.load_muted(),
@@ -42,6 +57,10 @@ class MochiApplication(Gtk.Application):
         if existing is not None:
             existing.present()
             return
+
+        # Plain GTK does not track the desktop's light/dark switch on its own.
+        self._color_scheme_sync = SystemColorSchemeSync(Gtk.Settings.get_default())
+        self._color_scheme_sync.start()
 
         window = Gtk.ApplicationWindow(application=self)
         window.add_css_class("mochi-buddy-window")
@@ -225,6 +244,8 @@ class MochiApplication(Gtk.Application):
         )
 
         window.present()
+        if self.update_ready_file is not None:
+            signal_update_ready(self.update_ready_file)
         if not self.preview_animations:
             self.sound.play(SoundEvent.SPAWN)
 
