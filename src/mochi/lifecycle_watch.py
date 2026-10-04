@@ -85,6 +85,8 @@ class LifecycleWatch:
             # without them, so its budget starts over instead of blaming it.
             self._last_advance = now
         self._last_tick = now
+        if self._motion_budget_ms is None and motion_budget_ms is not None:
+            self._last_advance = now
         self._motion_budget_ms = motion_budget_ms
         if advanced:
             self._last_advance = now
