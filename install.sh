@@ -12,6 +12,7 @@ BIN_DIR="$HOME/.local/bin"
 LAUNCHER="$BIN_DIR/mochi"
 UPDATE_LAUNCHER="$BIN_DIR/mochi-update"
 UNINSTALL_LAUNCHER="$BIN_DIR/mochi-uninstall"
+AGENT_SIGNAL_LAUNCHER="$BIN_DIR/mochi-agent-signal"
 INSTALLED_UNINSTALLER="$APP_HOME/uninstall.sh"
 APPLICATIONS_DIR="$DATA_HOME/applications"
 DESKTOP_FILE="$APPLICATIONS_DIR/$APP_ID.desktop"
@@ -203,6 +204,11 @@ install_integrations() {
         return 1
     fi
     install_launcher "$UPDATE_LAUNCHER" "$VENV/bin/mochi-update"
+    if [[ ! -x "$VENV/bin/mochi-agent-signal" ]]; then
+        warn "Mochi agent signal is missing: $VENV/bin/mochi-agent-signal"
+        return 1
+    fi
+    install_launcher "$AGENT_SIGNAL_LAUNCHER" "$VENV/bin/mochi-agent-signal"
 
     install -m 0755 "$ROOT/uninstall.sh" "$INSTALLED_UNINSTALLER"
     install_launcher "$UNINSTALL_LAUNCHER" "$INSTALLED_UNINSTALLER"
