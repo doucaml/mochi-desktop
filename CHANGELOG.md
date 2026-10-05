@@ -9,8 +9,9 @@ Mochi is still in early public alpha, so behavior, configuration, and compatibil
 ### Added
 
 - Mochi can keep you company while a coding agent works. Point Claude Code's
-  or Codex's hooks at the new `mochi-agent-signal` command and he opens his
-  laptop while the agent is busy, waves once if it's stuck waiting for you to
+  or Codex's hooks at the new `mochi-agent-signal` command and he sits with his
+  mug beside a little monitor that scrolls code while the agent is busy, waves
+  once if it's stuck waiting for you to
   answer a permission prompt, and does a little bounce when a run of a minute
   or more finishes. Quick turns stay quiet, he never
   wakes up for an agent, and he keeps quiet during Focus. The agent only ever

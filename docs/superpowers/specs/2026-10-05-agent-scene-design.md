@@ -4,7 +4,7 @@
 
 **Builds on:** Agent Companion (`docs/superpowers/specs/2026-10-05-agent-companion-design.md`, #176), terminal coworking (`src/mochi/presence/terminal_cowork.py`), and the canonical-overlay build pattern of `tools/build_reading.py`
 
-**Status:** design draft, awaiting maintainer approval. The art below is a draft for the maintainer to clean up in Pixelorama.
+**Status:** approved and implemented on `claude/agent-companion-scene` (#177); see [Implementation notes](#implementation-notes-2026-10-05). The committed frames are the draft for the maintainer to clean up in Pixelorama.
 
 ![Draft agent scene](media/2026-10-05-agent-scene-draft.gif)
 
@@ -177,3 +177,10 @@ The coworking sequence (intro → loop → outro on `TYPING`) wears one of two c
 - **Art quality.** The draft frames are composites. The main risks are the mug and monitor coming close during the sip, and the code lines' legibility at small sizes. Mitigation: maintainer cleanup, plus the 64/112/256 px check.
 - **Refactoring a proven sequence.** It is renaming plus a lookup. The #176 characterization tests guard the terminal path unchanged.
 - **Swap churn.** Bounded by the 5 s rule and by authored transitions. Worst case, a long agent turn in a terminal costs two transitions (in and out).
+
+## Implementation notes (2026-10-05)
+
+- **The builder matches the preview.** `tools/build_agent_scene.py` reproduces the approved preview frames pixel for pixel. Its test proves that every pixel outside the monitor's rectangle equals the source `coffee` frame.
+- **Loop and outro follow the art on screen.** They play the costume of the art already showing, and fall back to the costume chosen at intro. A cycle therefore stays consistent even if the context changes mid-cycle.
+- **The generic-typing `else` branch pins the laptop.** That branch of `_stop_terminal_coworking` handles the terminal hold on generic typing art, which only arises with the terminal focused. It sets the `terminal` costume explicitly, so a stale `agent` choice from an earlier cycle can't put a monitor outro over typing art.
+- **A swap that lands mid-intro is applied at the loop.** If agents stop while the agent intro is still playing, there's no loop yet to swap from, and the session is gone, so no poll is left to notice. `AgentCoworkMixin._play_terminal_loop` re-checks the costume as the intro hands over to the loop, and closes at once if it no longer fits. A test covers this.

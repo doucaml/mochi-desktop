@@ -3,8 +3,10 @@
 Mochi can keep you company while a coding agent works. With **Claude Code** or
 OpenAI's **Codex CLI** set up to tell him what they're doing:
 
-- he opens his little laptop and types along while any agent is working, and
-  puts it away when they're all done;
+- while any agent is working, he settles in with his mug beside a little
+  monitor that scrolls code, and puts it away when they're all done (in a
+  terminal, his laptop gives way to the monitor once a turn runs longer than a
+  few seconds);
 - if an agent is stuck waiting for you to answer a permission prompt, he waves
   once (and may say so) so you notice;
 - when a run that took a minute or more finishes, he does a small happy bounce.
@@ -36,7 +38,7 @@ ever reaches Mochi.
 
 The command talks to Mochi over the desktop session bus, the same channel his
 GNOME helper uses. Any program running as you can send Mochi these words too;
-the worst it can do is make him open his laptop, wave, or bounce.
+the worst it can do is make him bring out his monitor, wave, or bounce.
 
 ## Set up Claude Code
 
@@ -68,7 +70,7 @@ Add these hooks to `~/.claude/settings.json`. If the file already has a
 `Notification` one above.
 
 Claude Code doesn't run a hook when you interrupt a turn with Esc. Mochi puts
-the laptop away when your next turn finishes, or by himself after 15 quiet
+the monitor away when your next turn finishes, or by himself after 15 quiet
 minutes.
 
 ## Set up Codex
@@ -104,15 +106,15 @@ them; Mochi tidies up after 15 quiet minutes instead.
 ## Using an agent inside VS Code
 
 While VS Code is focused, Mochi does his usual VS Code coworking instead of
-the agent laptop, and a wave waits until he's standing idle. Switch to another
-window and the laptop comes back while the agent keeps working.
+the agent scene, and a wave waits until he's standing idle. Switch to another
+window and the monitor comes back while the agent keeps working.
 
 ## Turn it off
 
 Remove the hooks from `~/.claude/settings.json` or `~/.codex/hooks.json`.
 Mochi has no separate switch, and he never edits those files himself. Quiet
 mode and turning ambient reactions off silence his waves, bounces, and lines,
-but not the laptop.
+but not the monitor.
 
 Uninstalling Mochi? Remove the hooks first. Otherwise every hook reports
 "No such file or directory" once `mochi-agent-signal` is gone.
@@ -136,7 +138,7 @@ Uninstalling Mochi? Remove the hooks first. Otherwise every hook reports
 
    ```bash
    sleep 3; echo '{"session_id": "test"}' | ~/.local/bin/mochi-agent-signal working
-   # Mochi opens his laptop within about a second
+   # Mochi brings out his monitor within about a second
    sleep 10; echo '{"session_id": "test"}' | ~/.local/bin/mochi-agent-signal ended
    # ...and puts it away
    ```
@@ -146,6 +148,6 @@ Uninstalling Mochi? Remove the hooks first. Otherwise every hook reports
 4. **Codex does nothing?** Check `/hooks` in Codex and trust the Mochi hooks.
 5. **Mochi doesn't wave or bounce?** That's by design while he's asleep, during
    Focus, with quiet mode or ambient reactions off, or while you're dragging
-   him or have a menu open. He also skips a wave while he's busy at a laptop
+   him or have a menu open. He also skips a wave while he's busy at a laptop or monitor
    (for example while you're in a terminal or VS Code), since he only shows it
    once he's standing idle.
