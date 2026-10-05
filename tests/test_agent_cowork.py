@@ -778,3 +778,105 @@ def test_a_failing_tick_lets_the_next_event_rearm_the_poll(buddy_type, timers) -
     buddy.receive_agent_event("activity", TOKEN)
     assert buddy._agent_source_id is not None
     assert len(timers.armed) == 2
+
+
+# -- Coworking costumes ------------------------------------------------------------
+
+AGENT_ART = ("agent_intro", "agent_loop", "agent_outro")
+
+
+def _costumed_buddy(buddy_type, *, wanted: str, **kwargs):
+    buddy = _terminal_buddy(buddy_type, **kwargs)
+    buddy.COWORK_COSTUMES = {**TerminalCoworkMixin.COWORK_COSTUMES, "agent": AGENT_ART}
+    buddy._cowork_costume_for_context = Mock(return_value=wanted)
+    return buddy
+
+
+def test_every_coworking_name_check_goes_through_the_costume_table() -> None:
+    source = Path(terminal_cowork.__file__).read_text(encoding="utf-8")
+
+    for constant in ("INTRO", "LOOP", "OUTRO"):
+        assert f"self.TERMINAL_{constant}_ANIMATION" not in source
+
+
+@BUDDY_TYPES
+def test_cowork_role_finds_any_costumes_art(buddy_type) -> None:
+    buddy = _costumed_buddy(buddy_type, wanted="terminal")
+
+    assert buddy._cowork_role("terminal_intro") == "intro"
+    assert buddy._cowork_role("agent_loop") == "loop"
+    assert buddy._cowork_role("agent_outro") == "outro"
+    assert buddy._cowork_role("typing_loop") is None
+
+
+@BUDDY_TYPES
+def test_one_cycle_keeps_the_costume_it_opened_with(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(buddy_type, wanted="agent", state=MochiState.TYPING, active=True)
+
+    TerminalCoworkMixin._play_terminal_intro(buddy)
+    buddy._play_animation.assert_called_once_with("agent_intro", after=None)
+
+    # The context changes mid-cycle; the open cycle still finishes in agent art.
+    buddy._cowork_costume_for_context.return_value = "terminal"
+    buddy._current_animation = "agent_intro"
+    buddy._active_animation = ANIMATIONS["agent_intro"]
+    buddy._play_animation.reset_mock()
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+    buddy._play_animation.assert_called_once_with("agent_loop", after=None)
+
+    buddy._current_animation = "agent_loop"
+    buddy._play_animation.reset_mock()
+    TerminalCoworkMixin._stop_terminal_coworking(buddy)
+    buddy._play_animation.assert_called_once_with("agent_outro", after=None)
+
+
+@BUDDY_TYPES
+def test_reopening_after_an_outro_picks_the_costume_the_context_wants(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="terminal_outro", active=True
+    )
+
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+
+    buddy._play_animation.assert_called_once_with("agent_intro", after=None)
+
+
+@BUDDY_TYPES
+def test_leaving_during_an_agent_intro_queues_the_agent_outro(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="agent_intro", active=True
+    )
+    buddy._cowork_costume = "agent"
+
+    TerminalCoworkMixin._stop_terminal_coworking(buddy)
+
+    assert buddy._pending_animation == "agent_outro"
+
+
+@BUDDY_TYPES
+def test_video_interrupts_agent_art_too(buddy_type, timers, monkeypatch) -> None:
+    from mochi.presence.music_dance import MusicDanceMixin
+
+    monkeypatch.setattr(MusicDanceMixin, "_start_watching_emote", lambda self: True)
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="agent_loop", active=True
+    )
+
+    TerminalCoworkMixin._start_watching_emote(buddy)
+
+    buddy._transition_to.assert_called_once_with(MochiState.IDLE)
+    assert buddy._terminal_coworking_active is False
+
+
+@BUDDY_TYPES
+def test_begin_keeps_an_open_agent_cycle(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="agent_loop"
+    )
+    buddy._start_typing_emote = Mock()
+
+    TerminalCoworkMixin._begin_terminal_coworking(buddy)
+
+    assert buddy._terminal_coworking_active is True
+    buddy._play_animation.assert_not_called()
+    buddy._start_typing_emote.assert_not_called()
