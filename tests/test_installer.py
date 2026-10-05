@@ -120,11 +120,13 @@ if [[ "$1" == "-m" && "$2" == "venv" ]]; then
     chmod +x "$4/bin/python"
     printf '#!%s/bin/python\nexit 0\n' "$4" > "$4/bin/mochi"
     printf '#!%s/bin/python\nexit 0\n' "$4" > "$4/bin/mochi-update"
+    printf '#!%s/bin/python\nexit 0\n' "$4" > "$4/bin/mochi-agent-signal"
     printf '#!%s/bin/python\nexit 0\n' "$4" > "$4/bin/pip"
     printf 'export VIRTUAL_ENV=%s\n' "$4" > "$4/bin/activate"
     printf 'command = python3 -m venv %s\n' "$4" > "$4/pyvenv.cfg"
     chmod +x "$4/bin/mochi"
     chmod +x "$4/bin/mochi-update"
+    chmod +x "$4/bin/mochi-agent-signal"
     chmod +x "$4/bin/pip"
     exit 0
 fi
@@ -140,8 +142,10 @@ if [[ "$1" == "-m" && "$2" == "pip" && "$3" == "install" && "$*" == *"--no-deps 
     venv_bin="$(dirname "$0")"
     printf '#!%s\nexit 0\n' "$0" > "$venv_bin/mochi"
     printf '#!%s\nexit 0\n' "$0" > "$venv_bin/mochi-update"
+    printf '#!%s\nexit 0\n' "$0" > "$venv_bin/mochi-agent-signal"
     chmod +x "$venv_bin/mochi"
     chmod +x "$venv_bin/mochi-update"
+    chmod +x "$venv_bin/mochi-agent-signal"
     exit 0
 fi
 
@@ -202,6 +206,9 @@ def _run_installer(
         _write_executable(venv / "bin" / "mochi", "#!/bin/bash\nexit 0\n")
         _write_executable(
             venv / "bin" / "mochi-update", "#!/bin/bash\nexit 0\n"
+        )
+        _write_executable(
+            venv / "bin" / "mochi-agent-signal", "#!/bin/bash\nexit 0\n"
         )
 
     env = os.environ.copy()
@@ -441,6 +448,53 @@ def test_installer_exposes_update_launcher(tmp_path: Path) -> None:
     )
     assert launcher.exists()
     assert str(target) in launcher.read_text(encoding="utf-8")
+
+
+def test_installer_exposes_agent_signal_launcher(tmp_path: Path) -> None:
+    result, _log_dir = _run_installer(tmp_path, current_desktop="niri")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    home = tmp_path / "home"
+    launcher = home / ".local" / "bin" / "mochi-agent-signal"
+    target = (
+        home
+        / ".local"
+        / "share"
+        / "mochi-desktop"
+        / "venv"
+        / "bin"
+        / "mochi-agent-signal"
+    )
+    assert launcher.exists()
+    assert str(target) in launcher.read_text(encoding="utf-8")
+
+
+def test_uninstaller_removes_every_launcher(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    bin_dir = home / ".local" / "bin"
+    bin_dir.mkdir(parents=True)
+    names = ("mochi", "mochi-update", "mochi-uninstall", "mochi-agent-signal")
+    for name in names:
+        _write_executable(bin_dir / name, "#!/bin/bash\nexit 0\n")
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(home),
+        "USER": "mochi-test",
+        "XDG_DATA_HOME": str(home / ".local" / "share"),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+    }
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "uninstall.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    for name in names:
+        assert not (bin_dir / name).exists(), name
 
 
 def test_normal_install_writes_installed_build_metadata(tmp_path: Path) -> None:

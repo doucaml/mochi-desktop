@@ -917,6 +917,18 @@ EVENT_PHRASES: dict[str, tuple[str, ...]] = {
         "build succeeded? huge.",
         "code cooking",
     ),
+    "agent_needs_input": (
+        "your agent's waiting on you",
+        "psst. your agent has a question",
+        "someone needs a yes or no 🌱",
+        "your helper is waiting whenever you're ready",
+    ),
+    "agent_finished": (
+        "your agent finished!",
+        "all done over there 🌱",
+        "that was a long one. done!",
+        "the agent wrapped up",
+    ),
 }
 
 

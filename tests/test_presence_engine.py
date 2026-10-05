@@ -745,3 +745,105 @@ def test_presence_integration_wires_app_focus_hook_into_adapter():
     source = inspect.getsource(PresenceBuddyMixin.__init__)
 
     assert "on_focus_changed=self._on_presence_app_focus_changed" in source
+
+
+@pytest.mark.parametrize("event", ("agent_needs_input", "agent_finished"))
+def test_agent_events_speak_a_gentle_line_in_their_own_category(event):
+    from mochi.presence.phrases import EVENT_PHRASES
+
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1), rng=random.Random(1), clock=Clock()
+    )
+    assert engine.emit(event, now=0)
+
+    action = engine.evaluate(AmbientContext(), now=0)
+
+    assert action is not None
+    assert action.event == event
+    assert action.category == "agent"
+    assert action.priority == 30
+    assert action.text in EVENT_PHRASES[event]
+
+
+@pytest.mark.parametrize("event", ("agent_needs_input", "agent_finished"))
+def test_agent_events_use_their_own_silence_roll(event):
+    assert PresenceTuning().agent_event_probability == 0.90
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=0), rng=random.Random(1), clock=Clock()
+    )
+    engine.emit(event, now=0)
+
+    # The silenced event falls through to ordinary ambient speech, if any.
+    action = engine.evaluate(AmbientContext(), now=0)
+    assert action is None or action.event != event
+
+
+def test_agent_lines_stay_below_the_focus_floor():
+    from mochi.presence.focus_session import FOCUS_PRESENCE_PRIORITY_FLOOR
+
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1), rng=random.Random(1), clock=Clock()
+    )
+    engine.emit("agent_needs_input", now=0)
+
+    action = engine.evaluate(AmbientContext(), now=0)
+
+    assert action.priority < FOCUS_PRESENCE_PRIORITY_FLOOR
+
+
+def test_quiet_mode_silences_agent_lines():
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1, quiet_mode=True),
+        rng=random.Random(1),
+        clock=Clock(),
+    )
+    engine.emit("agent_finished", now=0)
+
+    assert engine.evaluate(AmbientContext(), now=0) is None
+
+
+@pytest.mark.parametrize("event", ("agent_needs_input", "agent_finished"))
+def test_agent_phrases_are_calm_and_guilt_free(event):
+    from mochi.presence.phrases import EVENT_PHRASES
+
+    lines = EVENT_PHRASES[event]
+    assert 3 <= len(lines) <= 5
+    for line in lines:
+        assert line == line.lower()
+        assert "!!" not in line
+        for word in ("hurry", "now", "asap", "urgent", "still", "forgot", "ignored"):
+            assert word not in line.split()
+
+
+@pytest.mark.parametrize("event", ("agent_needs_input", "agent_finished"))
+def test_agent_lines_expire_quickly_so_they_are_never_stale(event):
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1), rng=random.Random(1), clock=Clock()
+    )
+    engine.emit(event, now=0)
+
+    action = engine.evaluate(AmbientContext(), now=31)
+
+    assert action is None or action.event != event
+
+
+def test_other_events_keep_their_longer_queue_life():
+    engine = PresenceEngine(tuning=generous_tuning(), rng=random.Random(1), clock=Clock())
+    engine.emit("media_started", now=0)
+
+    action = engine.evaluate(AmbientContext(), now=100)
+
+    assert action is not None
+    assert action.event == "media_started"
+
+
+def test_discard_drops_a_queued_event_that_stopped_being_true():
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1), rng=random.Random(1), clock=Clock()
+    )
+    engine.emit("agent_needs_input", now=0)
+
+    engine.discard("agent_needs_input")
+
+    action = engine.evaluate(AmbientContext(), now=1)
+    assert action is None or action.event != "agent_needs_input"

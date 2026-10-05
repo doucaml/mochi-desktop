@@ -57,6 +57,7 @@ class PresenceTuning:
     media_probability: float = 0.75
     system_event_probability: float = 0.90
     build_event_probability: float = 0.90
+    agent_event_probability: float = 0.90
     speech_enabled: bool = True
     ambient_reactions_enabled: bool = True
     quiet_mode: bool = False
@@ -120,6 +121,9 @@ _EVENT_PRIORITY = {
     "network_restored": 40,
     "build_failed": 30,
     "build_succeeded": 30,
+    # Coding-agent lines stay below the Focus floor (40) on purpose.
+    "agent_needs_input": 30,
+    "agent_finished": 30,
 }
 _EVENT_CATEGORY = {
     "user_returned": "return_from_idle",
@@ -130,7 +134,17 @@ _EVENT_CATEGORY = {
     "network_restored": "network",
     "build_failed": "frustration",
     "build_succeeded": "developer",
+    "agent_needs_input": "agent",
+    "agent_finished": "agent",
 }
+
+# Queued events normally wait up to 120 s for a chance to be spoken. Agent
+# lines describe a moment that passes quickly, so they expire sooner.
+_EVENT_TTL_SECONDS = {
+    "agent_needs_input": 30.0,
+    "agent_finished": 30.0,
+}
+_DEFAULT_EVENT_TTL_SECONDS = 120.0
 
 # These events describe a momentary external fact, rather than a request from
 # the user.  A newer observation can therefore make an older queued reaction
@@ -235,6 +249,13 @@ class PresenceEngine:
             self._events.append(_QueuedEvent(name, timestamp))
             self._logger.debug("[presence] event=%s queued", name)
         return True
+
+    def discard(self, name: str) -> None:
+        """Drop a queued event that has stopped being true before it was spoken."""
+        stale = [event for event in self._events if event.name == name]
+        for event in stale:
+            self._events.remove(event)
+            self._logger.debug("[presence] discarded event=%s", name)
 
     def has_pending_event_at_least(self, priority: int) -> bool:
         """Whether a queued event should take precedence over a small greeting."""
@@ -555,11 +576,18 @@ class PresenceEngine:
             return self.tuning.system_event_probability
         if name in ("build_failed", "build_succeeded"):
             return self.tuning.build_event_probability
+        if name in ("agent_needs_input", "agent_finished"):
+            return self.tuning.agent_event_probability
         return 1.0
 
     def _prune_events(self, now: float) -> None:
         self._events = deque(
-            (event for event in self._events if now - event.created_at <= 120.0),
+            (
+                event
+                for event in self._events
+                if now - event.created_at
+                <= _EVENT_TTL_SECONDS.get(event.name, _DEFAULT_EVENT_TTL_SECONDS)
+            ),
             maxlen=16,
         )
 

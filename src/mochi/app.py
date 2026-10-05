@@ -8,14 +8,18 @@ from pathlib import Path
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gio, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
+from mochi.agent_activity import AGENT_EVENTS, AGENT_TOKEN_PATTERN
 from mochi.color_scheme import SystemColorSchemeSync
 from mochi.config import ConfigStore
 from mochi.presence.click_dialogue import PresenceBuddy, PresenceX11Buddy
 from mochi.sound import SoundEvent, SoundManager
 from mochi.windowing import WindowPlacement
 from mochi.x11 import request_keep_above
+
+
+AGENT_EVENT_ACTION = "agent-event"
 
 
 def signal_update_ready(path: Path) -> None:
@@ -51,6 +55,26 @@ class MochiApplication(Gtk.Application):
             volume=config.load_volume(),
             muted=config.load_muted(),
         )
+        if not preview_animations:
+            # GApplication already exports app actions over org.gtk.Actions, so
+            # `mochi-agent-signal` needs no new bus name, socket, or teardown.
+            agent_action = Gio.SimpleAction.new(
+                AGENT_EVENT_ACTION, GLib.VariantType.new("(ss)")
+            )
+            agent_action.connect("activate", self._on_agent_event_action)
+            self.add_action(agent_action)
+
+    def _on_agent_event_action(self, _action, parameter) -> None:
+        """Forward a validated coding-agent lifecycle event to the buddy."""
+        if parameter is None:
+            return
+        event, token = parameter.unpack()
+        if event not in AGENT_EVENTS or AGENT_TOKEN_PATTERN.fullmatch(token) is None:
+            self._logger.debug("Ignored a malformed agent event")
+            return
+        buddy = self._buddy
+        if buddy is not None:
+            buddy.receive_agent_event(event, token)
 
     def do_activate(self) -> None:
         existing = self.get_active_window()
