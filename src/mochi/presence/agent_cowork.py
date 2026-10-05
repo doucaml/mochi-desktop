@@ -19,8 +19,12 @@ class AgentCoworkMixin:
     action with one lifecycle word and an opaque per-session token. No prompt,
     path, command, or reply ever reaches Mochi.
 
-    A working agent is one more reason for terminal coworking's laptop to be
-    live. A long-unanswered permission prompt earns one ``wave`` beat and a
+    A working agent is one more reason for the coworking sequence to be live,
+    and it wears the ``agent`` costume: Mochi sips from his mug while a little
+    monitor scrolls code. An already-open laptop swaps to it through the
+    authored outro -> intro once an agent has worked for a few seconds, and back
+    when agents stop while a terminal is still focused.
+    A long-unanswered permission prompt earns one ``wave`` beat and a
     finished long run one ``excited`` beat, both through the standing-idle beat
     owner, plus an optional PresenceEngine line. This mixin owns one GLib poll
     source, alive only while sessions or a beat are pending.
@@ -30,13 +34,14 @@ class AgentCoworkMixin:
     AGENT_BEAT_TTL_SECONDS = 30.0
     AGENT_NEEDS_INPUT_BEAT = "wave"
     AGENT_FINISHED_BEAT = "excited"
-    _TERMINAL_ART = frozenset(
-        (
-            TerminalCoworkMixin.TERMINAL_INTRO_ANIMATION,
-            TerminalCoworkMixin.TERMINAL_LOOP_ANIMATION,
-            TerminalCoworkMixin.TERMINAL_OUTRO_ANIMATION,
-        )
-    )
+    # Quick back-and-forth turns in a terminal must not flip the open laptop
+    # to the agent scene and back every few seconds.
+    AGENT_SCENE_SWAP_DELAY_SECONDS = 5.0
+    COWORK_COSTUMES = {
+        **TerminalCoworkMixin.COWORK_COSTUMES,
+        "agent": ("agent_intro", "agent_loop", "agent_outro"),
+    }
+    _COWORK_ART = frozenset(name for names in COWORK_COSTUMES.values() for name in names)
 
     # Class-level defaults: every value is immutable, and some tests build
     # production buddies with ``__new__`` without running mixin initializers.
@@ -44,6 +49,7 @@ class AgentCoworkMixin:
     _agent_source_id: int | None = None
     _agent_pending_beat: str | None = None
     _agent_pending_beat_until = 0.0
+    _agent_work_started_at: float | None = None
 
     def _agent_now(self) -> float:
         # Keeps counting through suspend, so a run left "working" overnight
@@ -83,7 +89,7 @@ class AgentCoworkMixin:
             return
         if (
             self.state.current is MochiState.TYPING
-            and self._current_animation in self._TERMINAL_ART
+            and self._current_animation in self._COWORK_ART
         ):
             # The agent's laptop stays open (terminal hold below), but the
             # user's typing burst is over: stop typing-based bond XP rather
@@ -102,6 +108,7 @@ class AgentCoworkMixin:
         engine = getattr(self, "_ambient_presence_engine", None)
         for edge in edges:
             if edge is AgentEdge.WORK_STARTED:
+                self._agent_work_started_at = self._agent_now()
                 if engine is not None:
                     # Work resumed: an unspoken "waiting" or "finished" line
                     # is no longer true.
@@ -109,6 +116,7 @@ class AgentCoworkMixin:
                     engine.discard("agent_finished")
                 self._schedule_terminal_coworking()
             elif edge is AgentEdge.WORK_STOPPED:
+                self._agent_work_started_at = None
                 if not self._terminal_cowork_context_live():
                     self._stop_terminal_coworking()
             elif edge is AgentEdge.NEEDS_INPUT:
@@ -119,7 +127,52 @@ class AgentCoworkMixin:
                 self._queue_agent_beat(self.AGENT_FINISHED_BEAT)
                 if engine is not None:
                     engine.emit("agent_finished")
+        self._maybe_swap_cowork_costume()
         self._try_agent_beat()
+
+    # -- Costume --------------------------------------------------------------
+
+    def _cowork_costume_for_context(self) -> str:
+        tracker = self._agent_tracker
+        if (
+            tracker is not None
+            and tracker.working
+            and self._presence_app_category != "vscode"
+        ):
+            return "agent"
+        return super()._cowork_costume_for_context()
+
+    def _play_terminal_loop(self) -> None:
+        super()._play_terminal_loop()
+        # A costume change that arrived during the intro takes effect now:
+        # agents may have stopped mid-intro, with no poll left to notice.
+        self._maybe_swap_cowork_costume()
+
+    def _maybe_swap_cowork_costume(self) -> None:
+        """Close an open cycle whose costume no longer fits; it reopens in the new one.
+
+        Only from the loop, so intro and outro always finish as authored. The
+        outro leaves the sequence active, and the existing outro-finish path
+        reopens with whatever costume the context wants by then.
+        """
+        if not getattr(self, "_terminal_coworking_active", False):
+            return
+        if self.state.current is not MochiState.TYPING:
+            return
+        if self._cowork_role(self._current_animation) != "loop":
+            return
+        current = self._cowork_costume_of(self._current_animation)
+        wanted = self._cowork_costume_for_context()
+        if wanted == current:
+            return
+        if wanted == "agent":
+            started = self._agent_work_started_at
+            if (
+                started is None
+                or self._agent_now() - started < self.AGENT_SCENE_SWAP_DELAY_SECONDS
+            ):
+                return
+        self._play_terminal_outro()
 
     # -- Beats ----------------------------------------------------------------
 
@@ -196,4 +249,5 @@ class AgentCoworkMixin:
         if self._agent_tracker is not None:
             self._agent_tracker.clear()
         self._agent_pending_beat = None
+        self._agent_work_started_at = None
         super().shutdown_presence()
