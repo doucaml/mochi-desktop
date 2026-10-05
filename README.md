@@ -50,8 +50,8 @@ through the time you naturally spend together.
 ## What's new lately
 
 -  **Agent Companion** — Mochi can cowork with **Claude Code** and **Codex**:
-  he opens his laptop while your agent works, waves once if it's been waiting
-  on you, and bounces when a long run finishes. Opt in by adding a few agent
+  he sips from his mug beside a little monitor while your agent works, waves
+  once if it's been waiting on you, and bounces when a long run finishes. Opt in by adding a few agent
   hooks; only a one-word status and an anonymous session hash ever reach Mochi.
   See [Agent Companion](docs/agent-companion.md).
 -  **Built-in Mochi updater** — Mochi can now check for new builds, show a polished

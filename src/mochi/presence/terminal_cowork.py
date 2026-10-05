@@ -15,17 +15,56 @@ class TerminalCoworkMixin:
     terminal_intro -> terminal_loop -> terminal_outro. Focus owns the mode,
     while direct interactions and higher-priority watchable video may interrupt
     it without changing the existing pointer or context-menu architecture.
+
+    The sequence can wear different costumes: (intro, loop, outro) trios in
+    ``COWORK_COSTUMES``. An intro picks the costume the context wants; loop and
+    outro follow the art already on screen, so one open-close cycle never mixes
+    costumes.
     """
 
     TERMINAL_COWORK_DEBOUNCE_MS = 700
     TERMINAL_INTRO_ANIMATION = "terminal_intro"
     TERMINAL_LOOP_ANIMATION = "terminal_loop"
     TERMINAL_OUTRO_ANIMATION = "terminal_outro"
+    COWORK_COSTUMES = {
+        "terminal": (
+            TERMINAL_INTRO_ANIMATION,
+            TERMINAL_LOOP_ANIMATION,
+            TERMINAL_OUTRO_ANIMATION,
+        ),
+    }
+    _COWORK_ROLES = ("intro", "loop", "outro")
+    # Class-level default: immutable, and some tests build buddies with __new__.
+    _cowork_costume = "terminal"
 
     def __init__(self, *args, **kwargs) -> None:
         self._terminal_cowork_source_id: int | None = None
         self._terminal_coworking_active = False
         super().__init__(*args, **kwargs)
+
+    # -- Costumes -------------------------------------------------------------
+
+    def _cowork_costume_for_context(self) -> str:
+        """The costume a newly opening sequence should wear."""
+        return "terminal"
+
+    def _cowork_costume_of(self, name: str | None) -> str | None:
+        for costume, names in self.COWORK_COSTUMES.items():
+            if name in names:
+                return costume
+        return None
+
+    def _cowork_role(self, name: str | None) -> str | None:
+        """``intro``, ``loop`` or ``outro`` for any costume's art, else ``None``."""
+        costume = self._cowork_costume_of(name)
+        if costume is None:
+            return None
+        return self._COWORK_ROLES[self.COWORK_COSTUMES[costume].index(name)]
+
+    def _cowork_names(self) -> tuple[str, str, str]:
+        """The open cycle's trio: the art on screen, else the costume chosen at intro."""
+        costume = self._cowork_costume_of(self._current_animation) or self._cowork_costume
+        return self.COWORK_COSTUMES.get(costume, self.COWORK_COSTUMES["terminal"])
 
     def _terminal_cowork_context_live(self) -> bool:
         """Whether something currently calls for the terminal laptop.
@@ -110,13 +149,14 @@ class TerminalCoworkMixin:
             return GLib.SOURCE_REMOVE
 
         if self.state.current is MochiState.TYPING:
-            if self._current_animation == self.TERMINAL_LOOP_ANIMATION:
+            role = self._cowork_role(self._current_animation)
+            if role == "loop":
                 self._terminal_coworking_active = True
                 return GLib.SOURCE_REMOVE
-            if self._current_animation == self.TERMINAL_INTRO_ANIMATION:
+            if role == "intro":
                 self._terminal_coworking_active = True
                 return GLib.SOURCE_REMOVE
-            if self._current_animation == self.TERMINAL_OUTRO_ANIMATION:
+            if role == "outro":
                 # A fast refocus while the laptop is closing should finish the
                 # close cleanly, then reopen through the normal intro path.
                 self._terminal_coworking_active = True
@@ -143,21 +183,24 @@ class TerminalCoworkMixin:
         if self._computer_idle_source_id is not None:
             GLib.source_remove(self._computer_idle_source_id)
             self._computer_idle_source_id = None
-        self._play_animation(self.TERMINAL_INTRO_ANIMATION, after=None)
+        # The only place a costume is chosen: loop and outro follow its art.
+        self._cowork_costume = self._cowork_costume_for_context()
+        intro, _loop, _outro = self.COWORK_COSTUMES[self._cowork_costume]
+        self._play_animation(intro, after=None)
 
     def _play_terminal_loop(self) -> None:
         if self._computer_idle_source_id is not None:
             GLib.source_remove(self._computer_idle_source_id)
             self._computer_idle_source_id = None
-        self._play_animation(self.TERMINAL_LOOP_ANIMATION, after=None)
+        self._play_animation(self._cowork_names()[1], after=None)
 
     def _play_terminal_outro(self) -> None:
-        self._play_animation(self.TERMINAL_OUTRO_ANIMATION, after=None)
+        self._play_animation(self._cowork_names()[2], after=None)
 
     def _finish_reaction(self, finished_animation) -> None:
         """Advance terminal transition frames without changing Buddy's core FSM."""
         if finished_animation is self._active_animation:
-            if self._current_animation == self.TERMINAL_INTRO_ANIMATION:
+            if self._cowork_role(self._current_animation) == "intro":
                 self._pending_animation = None
                 if (
                     self._terminal_coworking_active
@@ -174,7 +217,7 @@ class TerminalCoworkMixin:
                     self._play_terminal_outro()
                 return
 
-            if self._current_animation == self.TERMINAL_OUTRO_ANIMATION:
+            if self._cowork_role(self._current_animation) == "outro":
                 self._pending_animation = None
                 if (
                     self._terminal_coworking_active
@@ -207,17 +250,19 @@ class TerminalCoworkMixin:
             if self._presence_app_category == "vscode":
                 self._cancel_vscode_cowork_source()
 
-            if self._current_animation == self.TERMINAL_INTRO_ANIMATION:
+            role = self._cowork_role(self._current_animation)
+            if role == "intro":
                 # Complete the open first, then close. _finish_reaction sees the
-                # inactive flag and advances into terminal_outro.
-                self._pending_animation = self.TERMINAL_OUTRO_ANIMATION
-            elif self._current_animation == self.TERMINAL_LOOP_ANIMATION:
+                # inactive flag and advances into the costume's outro.
+                self._pending_animation = self._cowork_names()[2]
+            elif role == "loop":
                 self._play_terminal_outro()
-            elif self._current_animation == self.TERMINAL_OUTRO_ANIMATION:
+            elif role == "outro":
                 pass
             else:
                 # Terminal focus may have arrived while a generic typing phase
-                # was still finishing. Use the authored outro when possible.
+                # was still finishing. Use the authored laptop outro when possible.
+                self._cowork_costume = "terminal"
                 self._play_terminal_outro()
         # If a direct interaction already interrupted terminal coworking, leave
         # that reaction alone. Its normal completion path will restore whatever
@@ -274,11 +319,7 @@ class TerminalCoworkMixin:
 
     def _start_watching_emote(self) -> bool:
         # Explicit watchable video can interrupt any terminal phase immediately.
-        terminal_animation_active = self._current_animation in {
-            self.TERMINAL_INTRO_ANIMATION,
-            self.TERMINAL_LOOP_ANIMATION,
-            self.TERMINAL_OUTRO_ANIMATION,
-        }
+        terminal_animation_active = self._cowork_role(self._current_animation) is not None
         if (
             self.state.current is MochiState.TYPING
             and (self._terminal_coworking_active or terminal_animation_active)

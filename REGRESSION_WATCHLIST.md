@@ -198,6 +198,11 @@ Use this checklist for interaction/state changes and before release checkpoints.
 - [ ] With Mochi not running, agent hooks produce no errors or delay
 - [ ] No agent events are handled after Mochi stops
 - [ ] `mochi-agent-signal` prints nothing in any case (hook stdout can reach the agent's context)
+- [ ] Agent scene: entering from idle and returning to idle never pops a frame; the monitor rises, boots, and sinks cleanly
+- [ ] Quick turns in a terminal (< 5 s) keep the laptop; no laptop ↔ monitor flicker
+- [ ] A longer turn in a terminal swaps laptop → monitor through outro → intro, never mid-loop
+- [ ] When the agent stops while the terminal is still focused, the monitor gives way to the laptop again
+- [ ] Agent scene art is legible at 112 px and 256 px; at 64 px the screen may read as texture
 
 ## AmbiSense Helper Lifecycle (#58)
 

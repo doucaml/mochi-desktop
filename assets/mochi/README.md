@@ -61,6 +61,13 @@ Do not keep export ZIPs, spritesheets, Pixelorama source files, temporary render
   imports the intro and outro from the Pixelorama export and snaps export color
   drift to the canonical palette; `tools/import_terminal_loop.py` imports the
   separately redrawn loop with the same palette snap.
+- `agent_intro`, `agent_loop`, `agent_outro` — the agent-session costume of the
+  same coworking sequence, played while a coding agent works: Mochi sips from
+  his mug while a little monitor beside him scrolls code. Built by
+  `tools/build_agent_scene.py` from the untouched `coffee` frames plus one
+  monitor prop (a PixelEngine draft, keyed and transcribed as palette art). The
+  committed PNGs are the source of truth once hand-cleaned; the builder refuses
+  to overwrite them without `--force`.
 - `watch` — media/watch-along state.
 - `searching` — file/search activity state.
 - `reading` — low-energy reading loop: the idle breathing body holding a small

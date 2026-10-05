@@ -81,7 +81,7 @@ and replies are discarded and never reach Mochi.
 The command calls Mochi's `agent-event` application action over the session
 bus. Mochi validates both values again before using them. Like the helper's
 signals, any process running as the same user can send these events; the
-worst one can do is make Mochi open his laptop, wave, or bounce.
+worst one can do is make Mochi bring out his monitor, wave, or bounce.
 
 ## Session return
 

@@ -621,13 +621,13 @@ def test_agent_run_end_to_end_through_real_terminal_coworking(buddy_type, timers
     buddy.receive_agent_event("working", TOKEN)
     [debounce] = [callback for delay, callback in timers.armed if delay == 700]
     debounce()
-    assert buddy._current_animation == "terminal_intro"
+    assert buddy._current_animation == "agent_intro"  # the agent scene, not the laptop
     TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
-    assert buddy._current_animation == "terminal_loop"
+    assert buddy._current_animation == "agent_loop"
 
     buddy._agent_now.now += 61.0
     buddy.receive_agent_event("finished", TOKEN)
-    assert buddy._current_animation == "terminal_outro"
+    assert buddy._current_animation == "agent_outro"
     buddy._play_idle_beat.assert_called_once_with("excited")  # refused: still closing
 
     TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
@@ -778,3 +778,281 @@ def test_a_failing_tick_lets_the_next_event_rearm_the_poll(buddy_type, timers) -
     buddy.receive_agent_event("activity", TOKEN)
     assert buddy._agent_source_id is not None
     assert len(timers.armed) == 2
+
+
+# -- Coworking costumes ------------------------------------------------------------
+
+AGENT_ART = ("agent_intro", "agent_loop", "agent_outro")
+
+
+def _costumed_buddy(buddy_type, *, wanted: str, **kwargs):
+    buddy = _terminal_buddy(buddy_type, **kwargs)
+    buddy.COWORK_COSTUMES = {**TerminalCoworkMixin.COWORK_COSTUMES, "agent": AGENT_ART}
+    buddy._cowork_costume_for_context = Mock(return_value=wanted)
+    return buddy
+
+
+def test_every_coworking_name_check_goes_through_the_costume_table() -> None:
+    source = Path(terminal_cowork.__file__).read_text(encoding="utf-8")
+
+    for constant in ("INTRO", "LOOP", "OUTRO"):
+        assert f"self.TERMINAL_{constant}_ANIMATION" not in source
+
+
+@BUDDY_TYPES
+def test_cowork_role_finds_any_costumes_art(buddy_type) -> None:
+    buddy = _costumed_buddy(buddy_type, wanted="terminal")
+
+    assert buddy._cowork_role("terminal_intro") == "intro"
+    assert buddy._cowork_role("agent_loop") == "loop"
+    assert buddy._cowork_role("agent_outro") == "outro"
+    assert buddy._cowork_role("typing_loop") is None
+
+
+@BUDDY_TYPES
+def test_one_cycle_keeps_the_costume_it_opened_with(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(buddy_type, wanted="agent", state=MochiState.TYPING, active=True)
+
+    TerminalCoworkMixin._play_terminal_intro(buddy)
+    buddy._play_animation.assert_called_once_with("agent_intro", after=None)
+
+    # The context changes mid-cycle; the open cycle still finishes in agent art.
+    buddy._cowork_costume_for_context.return_value = "terminal"
+    buddy._current_animation = "agent_intro"
+    buddy._active_animation = ANIMATIONS["agent_intro"]
+    buddy._play_animation.reset_mock()
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+    buddy._play_animation.assert_called_once_with("agent_loop", after=None)
+
+    buddy._current_animation = "agent_loop"
+    buddy._play_animation.reset_mock()
+    TerminalCoworkMixin._stop_terminal_coworking(buddy)
+    buddy._play_animation.assert_called_once_with("agent_outro", after=None)
+
+
+@BUDDY_TYPES
+def test_reopening_after_an_outro_picks_the_costume_the_context_wants(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="terminal_outro", active=True
+    )
+
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+
+    buddy._play_animation.assert_called_once_with("agent_intro", after=None)
+
+
+@BUDDY_TYPES
+def test_leaving_during_an_agent_intro_queues_the_agent_outro(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="agent_intro", active=True
+    )
+    buddy._cowork_costume = "agent"
+
+    TerminalCoworkMixin._stop_terminal_coworking(buddy)
+
+    assert buddy._pending_animation == "agent_outro"
+
+
+@BUDDY_TYPES
+def test_video_interrupts_agent_art_too(buddy_type, timers, monkeypatch) -> None:
+    from mochi.presence.music_dance import MusicDanceMixin
+
+    monkeypatch.setattr(MusicDanceMixin, "_start_watching_emote", lambda self: True)
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="agent_loop", active=True
+    )
+
+    TerminalCoworkMixin._start_watching_emote(buddy)
+
+    buddy._transition_to.assert_called_once_with(MochiState.IDLE)
+    assert buddy._terminal_coworking_active is False
+
+
+@BUDDY_TYPES
+def test_begin_keeps_an_open_agent_cycle(buddy_type, timers) -> None:
+    buddy = _costumed_buddy(
+        buddy_type, wanted="agent", state=MochiState.TYPING, animation="agent_loop"
+    )
+    buddy._start_typing_emote = Mock()
+
+    TerminalCoworkMixin._begin_terminal_coworking(buddy)
+
+    assert buddy._terminal_coworking_active is True
+    buddy._play_animation.assert_not_called()
+    buddy._start_typing_emote.assert_not_called()
+
+
+
+# -- Agent scene costume and swaps -------------------------------------------------
+
+
+def _laptop_open_in_terminal(buddy_type):
+    """You're in a terminal with the laptop out, before any agent works."""
+    return _agent_buddy(
+        buddy_type, category="terminal", state=MochiState.TYPING, animation="terminal_loop", active=True
+    )
+
+
+@BUDDY_TYPES
+def test_agent_costume_is_registered_beside_the_laptop(buddy_type) -> None:
+    assert buddy_type.COWORK_COSTUMES["agent"] == AGENT_ART
+    assert buddy_type.COWORK_COSTUMES["terminal"] == (
+        "terminal_intro",
+        "terminal_loop",
+        "terminal_outro",
+    )
+
+
+@BUDDY_TYPES
+def test_costume_choice_follows_the_agents(buddy_type, timers) -> None:
+    buddy = _agent_buddy(buddy_type)
+    assert buddy._cowork_costume_for_context() == "terminal"  # no agents yet
+
+    buddy.receive_agent_event("working", TOKEN)
+    assert buddy._cowork_costume_for_context() == "agent"
+    buddy._presence_app_category = "terminal"
+    assert buddy._cowork_costume_for_context() == "agent"
+    buddy._presence_app_category = "vscode"
+    assert buddy._cowork_costume_for_context() == "terminal"
+
+
+@BUDDY_TYPES
+def test_open_laptop_swaps_to_the_agent_scene_after_five_seconds(buddy_type, timers) -> None:
+    buddy = _laptop_open_in_terminal(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._agent_now.now += 4.9
+    buddy._agent_tick()
+    buddy._play_animation.assert_not_called()
+
+    buddy._agent_now.now += 0.1
+    buddy._agent_tick()
+
+    buddy._play_animation.assert_called_once_with("terminal_outro", after=None)
+    assert buddy._terminal_coworking_active is True  # the outro reopens, not closes
+
+
+@BUDDY_TYPES
+def test_quick_terminal_turns_never_swap(buddy_type, timers) -> None:
+    buddy = _laptop_open_in_terminal(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._agent_now.now += 4.0
+    buddy._agent_tick()
+    buddy.receive_agent_event("finished", TOKEN)
+    buddy._agent_now.now += 10.0
+    buddy._agent_tick()
+
+    buddy._play_animation.assert_not_called()
+
+
+@BUDDY_TYPES
+def test_swaps_only_start_from_the_loop(buddy_type, timers) -> None:
+    buddy = _agent_buddy(
+        buddy_type, category="terminal", state=MochiState.TYPING, animation="terminal_intro", active=True
+    )
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._agent_now.now += 30.0
+
+    buddy._agent_tick()
+
+    buddy._play_animation.assert_not_called()
+
+
+@BUDDY_TYPES
+def test_after_the_swap_outro_the_agent_scene_opens(buddy_type, timers) -> None:
+    buddy = _laptop_open_in_terminal(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._current_animation = "terminal_outro"
+    buddy._active_animation = ANIMATIONS["terminal_outro"]
+
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+
+    buddy._play_animation.assert_called_once_with("agent_intro", after=None)
+
+
+@BUDDY_TYPES
+def test_agents_stopping_in_a_terminal_bring_the_laptop_back(buddy_type, timers) -> None:
+    buddy = _agent_buddy(
+        buddy_type, category="terminal", state=MochiState.TYPING, animation="agent_loop", active=True
+    )
+    buddy._cowork_costume = "agent"
+    buddy.receive_agent_event("working", TOKEN)
+
+    buddy.receive_agent_event("finished", TOKEN)
+
+    buddy._stop_terminal_coworking.assert_not_called()
+    buddy._play_animation.assert_called_once_with("agent_outro", after=None)
+    buddy._current_animation = "agent_outro"
+    buddy._active_animation = ANIMATIONS["agent_outro"]
+    buddy._play_animation.reset_mock()
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+    buddy._play_animation.assert_called_once_with("terminal_intro", after=None)
+
+
+@BUDDY_TYPES
+def test_agents_stopping_elsewhere_close_the_scene(buddy_type, timers) -> None:
+    buddy = _agent_buddy(buddy_type, state=MochiState.TYPING, animation="agent_loop", active=True)
+    del buddy._stop_terminal_coworking  # the real close
+    buddy._cowork_costume = "agent"
+    buddy.receive_agent_event("working", TOKEN)
+
+    buddy.receive_agent_event("finished", TOKEN)
+
+    buddy._play_animation.assert_called_once_with("agent_outro", after=None)
+    assert buddy._terminal_coworking_active is False
+
+
+@BUDDY_TYPES
+def test_recovery_after_a_drag_reopens_the_agent_scene(buddy_type, timers) -> None:
+    buddy = _agent_buddy(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._is_idle_visual_active = Mock(return_value=True)
+    buddy._start_typing_emote = Mock(return_value=True)
+
+    assert TerminalCoworkMixin._maybe_resume_terminal_coworking(buddy) is True
+
+    buddy._play_animation.assert_called_once_with("agent_intro", after=None)
+
+
+@BUDDY_TYPES
+def test_agent_scene_holds_its_typing_stop_like_the_laptop(buddy_type, timers, monkeypatch) -> None:
+    from mochi.presence.bond_meter import BondMeterMixin
+
+    bond_stop = Mock()
+    monkeypatch.setattr(BondMeterMixin, "_on_typing_stopped", bond_stop)
+    buddy = _working_agent_buddy(
+        buddy_type, state=MochiState.TYPING, animation="agent_loop", active=True
+    )
+    buddy._finish_bond_typing_session = Mock()
+
+    buddy._on_typing_stopped()
+
+    buddy._finish_bond_typing_session.assert_called_once_with()
+    bond_stop.assert_not_called()
+    assert buddy._terminal_coworking_active is True
+
+
+@BUDDY_TYPES
+def test_agents_stopping_during_the_agent_intro_still_bring_the_laptop_back(
+    buddy_type, timers
+) -> None:
+    buddy = _agent_buddy(
+        buddy_type, category="terminal", state=MochiState.TYPING, animation="agent_intro", active=True
+    )
+    buddy._cowork_costume = "agent"
+    buddy.receive_agent_event("working", TOKEN)
+    buddy.receive_agent_event("finished", TOKEN)  # stops mid-intro: nothing to swap yet
+    assert buddy._agent_tick() is GLib.SOURCE_REMOVE  # no poll is left to notice later
+    buddy._play_animation.assert_not_called()
+
+    def play(name, after=None) -> None:
+        buddy._current_animation = name
+        buddy._active_animation = ANIMATIONS[name]
+
+    buddy._play_animation = Mock(side_effect=play)
+    TerminalCoworkMixin._finish_reaction(buddy, buddy._active_animation)
+
+    # The intro hands over to the loop, which notices at once and closes.
+    assert [call.args[0] for call in buddy._play_animation.call_args_list] == [
+        "agent_loop",
+        "agent_outro",
+    ]
