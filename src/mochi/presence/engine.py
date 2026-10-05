@@ -57,6 +57,7 @@ class PresenceTuning:
     media_probability: float = 0.75
     system_event_probability: float = 0.90
     build_event_probability: float = 0.90
+    agent_event_probability: float = 0.90
     speech_enabled: bool = True
     ambient_reactions_enabled: bool = True
     quiet_mode: bool = False
@@ -120,6 +121,9 @@ _EVENT_PRIORITY = {
     "network_restored": 40,
     "build_failed": 30,
     "build_succeeded": 30,
+    # Coding-agent lines stay below the Focus floor (40) on purpose.
+    "agent_needs_input": 30,
+    "agent_finished": 30,
 }
 _EVENT_CATEGORY = {
     "user_returned": "return_from_idle",
@@ -130,6 +134,8 @@ _EVENT_CATEGORY = {
     "network_restored": "network",
     "build_failed": "frustration",
     "build_succeeded": "developer",
+    "agent_needs_input": "agent",
+    "agent_finished": "agent",
 }
 
 # These events describe a momentary external fact, rather than a request from
@@ -555,6 +561,8 @@ class PresenceEngine:
             return self.tuning.system_event_probability
         if name in ("build_failed", "build_succeeded"):
             return self.tuning.build_event_probability
+        if name in ("agent_needs_input", "agent_finished"):
+            return self.tuning.agent_event_probability
         return 1.0
 
     def _prune_events(self, now: float) -> None:
