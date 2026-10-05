@@ -813,3 +813,37 @@ def test_agent_phrases_are_calm_and_guilt_free(event):
         assert "!!" not in line
         for word in ("hurry", "now", "asap", "urgent", "still", "forgot", "ignored"):
             assert word not in line.split()
+
+
+@pytest.mark.parametrize("event", ("agent_needs_input", "agent_finished"))
+def test_agent_lines_expire_quickly_so_they_are_never_stale(event):
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1), rng=random.Random(1), clock=Clock()
+    )
+    engine.emit(event, now=0)
+
+    action = engine.evaluate(AmbientContext(), now=31)
+
+    assert action is None or action.event != event
+
+
+def test_other_events_keep_their_longer_queue_life():
+    engine = PresenceEngine(tuning=generous_tuning(), rng=random.Random(1), clock=Clock())
+    engine.emit("media_started", now=0)
+
+    action = engine.evaluate(AmbientContext(), now=100)
+
+    assert action is not None
+    assert action.event == "media_started"
+
+
+def test_discard_drops_a_queued_event_that_stopped_being_true():
+    engine = PresenceEngine(
+        tuning=generous_tuning(agent_event_probability=1), rng=random.Random(1), clock=Clock()
+    )
+    engine.emit("agent_needs_input", now=0)
+
+    engine.discard("agent_needs_input")
+
+    action = engine.evaluate(AmbientContext(), now=1)
+    assert action is None or action.event != "agent_needs_input"

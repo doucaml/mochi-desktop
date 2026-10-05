@@ -750,3 +750,16 @@ def test_switching_apps_while_the_agent_laptop_is_open_does_not_restart_it(
 
     buddy._schedule_terminal_coworking.assert_not_called()
     buddy._stop_terminal_coworking.assert_not_called()
+
+
+@BUDDY_TYPES
+def test_resumed_work_discards_queued_agent_lines(buddy_type, timers) -> None:
+    buddy = _agent_buddy(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy.receive_agent_event("prompt_waiting", TOKEN)
+    buddy._agent_now.now += 20.0
+
+    buddy.receive_agent_event("activity", TOKEN)  # answered: work resumes
+
+    discarded = {call.args[0] for call in buddy._ambient_presence_engine.discard.call_args_list}
+    assert discarded == {"agent_needs_input", "agent_finished"}

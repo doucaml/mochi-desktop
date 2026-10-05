@@ -102,6 +102,11 @@ class AgentCoworkMixin:
         engine = getattr(self, "_ambient_presence_engine", None)
         for edge in edges:
             if edge is AgentEdge.WORK_STARTED:
+                if engine is not None:
+                    # Work resumed: an unspoken "waiting" or "finished" line
+                    # is no longer true.
+                    engine.discard("agent_needs_input")
+                    engine.discard("agent_finished")
                 self._schedule_terminal_coworking()
             elif edge is AgentEdge.WORK_STOPPED:
                 if not self._terminal_cowork_context_live():
