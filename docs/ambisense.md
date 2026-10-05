@@ -32,7 +32,8 @@ Depending on the desktop environment and available helpers, AmbiSense can use:
 - anonymous typing activity and sustained typing intensity;
 - active, idle, lock, suspend, and return state;
 - coarse app categories such as editor, terminal, browser, media, or pixel-art
-  software;
+  software, plus content-free pulses when you switch windows or change
+  browser tab;
 - focused media playback, battery and charging transitions, network changes,
   and file-browsing activity.
 
@@ -47,6 +48,20 @@ typed text, reconstruct words, log key values, or persist typing history.
 Application awareness is reduced to broad semantic categories before Mochi
 reacts. The goal is to observe the shape of desktop activity without reading
 the user's work.
+
+Browser tab awareness is timing-only. While the focused window is a browser,
+the GNOME helper watches its title change inside GNOME Shell, keeps a one-way
+digest in memory to tell whether it changed, and sends Mochi a pulse with no
+data. The title never leaves GNOME Shell, and the pulse goes out only within
+two seconds of real keyboard or pointer input, so unread counters and autoplay
+that retitle the page while you're hands-off do not count. Once the helper
+classifies a browser window as YouTube, immediately when focus lands on it and
+otherwise within about a second, tab tracking pauses and reads no further
+title for that window. Until then, a title change on an already-tracked
+window, including the one that takes it to YouTube, is handled like any other.
+The existing YouTube check, which reduces a title to a yes or no, is
+unchanged. Like the helper's other signals, the pulse's timing is visible on
+the session bus.
 
 AmbiSense is a local rule-based behavior engine, not an LLM or cloud AI
 service.

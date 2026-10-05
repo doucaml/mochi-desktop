@@ -4,7 +4,20 @@ Notable user-facing changes to Mochi are tracked here.
 
 Mochi is still in early public alpha, so behavior, configuration, and compatibility details may change between prereleases.
 
-## Unreleased
+## 0.4.1 — Curious & Steady
+
+Mochi notices where your attention goes, and stays animated and updatable
+on GNOME.
+
+### Added
+
+- Mochi now notices when you switch windows or settle on a new browser tab.
+  If he's standing around he takes a quick look through his magnifying glass;
+  if he's busy he shows a tiny thought bubble instead, and he settles down
+  during long browsing sessions. Both come from the GNOME helper, which tells
+  Mochi that you switched, and at most a broad app type such as browser or
+  terminal, never a title or address. They start working after you log out
+  and back in once the update installs.
 
 ### Changed
 

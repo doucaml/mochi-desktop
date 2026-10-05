@@ -297,19 +297,34 @@ class NetworkSignalAdapter:
 
 
 class AppCategorySignalAdapter:
-    """Receive only a coarse focused-application category from GNOME Shell.
+    """Receive coarse, content-free app signals from GNOME Shell.
 
     The companion extension performs classification inside the compositor and
     sends one of a tiny allow-list of semantic categories. Application IDs,
     window titles, file names, and content never cross this D-Bus boundary.
-    Older extension versions simply never emit this optional signal, leaving
-    the category as ``unknown`` without affecting Mochi.
+
+    Three optional helper signals arrive here:
+
+    - ``AppCategoryChanged(s)``: the focused window's category changed.
+    - ``AppFocusChanged(s)``: window focus moved, with the same coarse
+      category, even when the category did not change.
+    - ``BrowserTabChanged()``: a payload-free pulse each time the focused
+      browser window's title changes (ignoring a leading unread badge), or
+      that window leaves a YouTube tab, within two seconds of user input. The
+      extension sends one per change and does not wait for the tab to settle;
+      curiosity applies its own settle delay.
+
+    Older extension versions never emit some or all of them. Without
+    ``AppCategoryChanged`` the category stays ``unknown``; the other two simply
+    never fire. Either way Mochi is unaffected.
     """
 
     BUS_NAME = "io.github.mochi_desktop.Mochi.TypingMonitor"
     OBJECT_PATH = "/io/github/mochi_desktop/Mochi/TypingMonitor"
     INTERFACE = "io.github.mochi_desktop.Mochi.TypingMonitor"
     SIGNAL_NAME = "AppCategoryChanged"
+    FOCUS_SIGNAL_NAME = "AppFocusChanged"
+    TAB_SIGNAL_NAME = "BrowserTabChanged"
     ALLOWED = frozenset(("vscode", "editor", "terminal", "browser", "media", "pixel_art", "unknown"))
 
     def __init__(
@@ -317,11 +332,15 @@ class AppCategorySignalAdapter:
         *,
         on_category_changed: Callable[[str], None],
         on_category_snapshot: Callable[[str], None] | None = None,
+        on_focus_changed: Callable[[str], None] | None = None,
+        on_tab_changed: Callable[[], None] | None = None,
         logger: logging.Logger | None = None,
         gio_loader: Callable[[], tuple[object, object]] | None = None,
     ) -> None:
         self._on_category_changed = on_category_changed
         self._on_category_snapshot = on_category_snapshot
+        self._on_focus_changed = on_focus_changed
+        self._on_tab_changed = on_tab_changed
         self._logger = logger or logging.getLogger(__name__)
         self._gio_loader = gio_loader or self._load_gio
         self._helper = None
@@ -341,7 +360,11 @@ class AppCategorySignalAdapter:
             return True
         self._helper = HelperConnection(
             self._gio_loader,
-            {self.SIGNAL_NAME: self._on_category_signal},
+            {
+                self.SIGNAL_NAME: self._on_category_signal,
+                self.FOCUS_SIGNAL_NAME: self._on_focus_signal,
+                self.TAB_SIGNAL_NAME: self._on_tab_signal,
+            },
             # Helper state is a startup baseline, not a focus transition. In
             # particular, do not enter VS Code/terminal coworking merely
             # because one was focused before Mochi subscribed.
@@ -388,6 +411,38 @@ class AppCategorySignalAdapter:
         except Exception:
             return
         self._set_category(category)
+
+    def _on_focus_signal(
+        self,
+        _connection,
+        _sender_name,
+        _object_path,
+        _interface_name,
+        _signal_name,
+        parameters,
+    ) -> None:
+        try:
+            unpacked = parameters.unpack()
+            category = unpacked[0] if isinstance(unpacked, tuple) else unpacked
+        except Exception:
+            return
+        if category not in self.ALLOWED:
+            return
+        self._logger.debug("[presence] app focus category=%s", category)
+        if self._on_focus_changed is not None:
+            self._on_focus_changed(category)
+
+    def _on_tab_signal(self, *_signal_args) -> None:
+        """Forward a payload-free pulse: the focused browser changed tab or page.
+
+        The extension sends one per change, without waiting for a settle. It
+        carries no title, URL, or identity and goes out only within two
+        seconds of real user input, so there is nothing to validate beyond
+        delivery.
+        """
+        self._logger.debug("[presence] browser tab changed")
+        if self._on_tab_changed is not None:
+            self._on_tab_changed()
 
     def _set_category(self, category, *, emit: bool = True) -> None:
         if category not in self.ALLOWED or category == self.category:

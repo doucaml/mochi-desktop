@@ -123,11 +123,50 @@ def test_app_category_owner_replacement_clears_and_resyncs():
     # The first helper snapshot establishes a baseline. A reconnect after
     # losing the helper is a real state change and still reaches consumers.
     assert events == ["unknown", "browser"]
-    assert len(bus.subscriptions) == 1
+    assert len(bus.subscriptions) == 3
+    subscribed_signals = {args[2] for args in bus.subscriptions.values()}
+    assert subscribed_signals == {
+        "AppCategoryChanged",
+        "AppFocusChanged",
+        "BrowserTabChanged",
+    }
     adapter.stop()
     assert events[-1] == "unknown"
     bus.change_owner(":1.3")
     assert len(bus.subscriptions) == 0
+
+
+def test_browser_tab_signal_dispatches_once_and_drops_stale_owner_pulses():
+    from mochi.presence.signals import AppCategorySignalAdapter
+    bus = Bus()
+    tabs = []
+    adapter = AppCategorySignalAdapter(
+        on_category_changed=lambda _category: None,
+        on_tab_changed=lambda: tabs.append(True),
+        gio_loader=bus.loader,
+    )
+    assert adapter.start()
+    bus.change_owner(":1.1")
+
+    def tab_dispatch(owner):
+        matches = [
+            args[-1] for args in bus.subscriptions.values()
+            if args[0] == owner and args[2] == "BrowserTabChanged"
+        ]
+        assert len(matches) == 1, f"expected one BrowserTabChanged subscription for {owner}"
+        return matches[0]
+
+    first_owner_dispatch = tab_dispatch(":1.1")
+    first_owner_dispatch(None, None, None, None, None, None)
+    assert tabs == [True]
+
+    bus.change_owner(":1.2")
+    first_owner_dispatch(None, None, None, None, None, None)
+    assert tabs == [True]
+
+    tab_dispatch(":1.2")(None, None, None, None, None, None)
+    assert tabs == [True, True]
+    adapter.stop()
 
 
 def test_file_loss_preserves_download_activity():

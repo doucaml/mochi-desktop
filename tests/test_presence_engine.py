@@ -421,6 +421,49 @@ def test_app_category_adapter_accepts_only_coarse_allow_list():
     assert adapter.category == "pixel_art"
 
 
+def test_app_focus_signal_emits_even_when_category_is_unchanged():
+    from mochi.presence.signals import AppCategorySignalAdapter
+
+    focus = []
+    adapter = AppCategorySignalAdapter(
+        on_category_changed=lambda _category: None,
+        on_focus_changed=focus.append,
+    )
+    adapter.category = "browser"
+
+    class Params:
+        def unpack(self):
+            return ("browser",)
+
+    adapter._on_focus_signal(None, None, None, None, None, Params())
+
+    assert focus == ["browser"]
+    assert adapter.category == "browser"
+
+
+def test_app_focus_signal_rejects_categories_outside_the_allow_list():
+    # The allow-list keeps arbitrary strings (an app ID, a title) out of the
+    # logs and out of curiosity's reasons, even from a misbehaving sender.
+    from mochi.presence.signals import AppCategorySignalAdapter
+
+    focus = []
+    logger = Mock()
+    adapter = AppCategorySignalAdapter(
+        on_category_changed=lambda _category: None,
+        on_focus_changed=focus.append,
+        logger=logger,
+    )
+
+    class Params:
+        def unpack(self):
+            return ("org.example.SecretApp",)
+
+    adapter._on_focus_signal(None, None, None, None, None, Params())
+
+    assert focus == []
+    assert "org.example.SecretApp" not in repr(logger.mock_calls)
+
+
 def test_app_category_initial_snapshot_syncs_without_change_event():
     from mochi.presence.signals import AppCategorySignalAdapter
 
@@ -660,3 +703,45 @@ def test_network_reacts_only_when_connected_state_changes():
 
     assert lost == [True]
     assert restored == [True]
+
+
+def test_browser_tab_signal_invokes_tab_callback_without_changing_category():
+    from mochi.presence.signals import AppCategorySignalAdapter
+
+    tabs = []
+    adapter = AppCategorySignalAdapter(
+        on_category_changed=lambda _category: None,
+        on_tab_changed=lambda: tabs.append(True),
+    )
+    adapter.category = "browser"
+
+    adapter._on_tab_signal(None, None, None, None, None, None)
+
+    assert tabs == [True]
+    assert adapter.category == "browser"
+
+
+def test_browser_tab_signal_without_callback_is_ignored():
+    from mochi.presence.signals import AppCategorySignalAdapter
+
+    adapter = AppCategorySignalAdapter(on_category_changed=lambda _category: None)
+
+    adapter._on_tab_signal(None, None, None, None, None, None)
+
+    assert adapter.category == "unknown"
+
+
+def test_presence_integration_wires_browser_tab_hook_into_adapter():
+    import inspect
+
+    source = inspect.getsource(PresenceBuddyMixin.__init__)
+
+    assert "on_tab_changed=self._on_presence_browser_tab_changed" in source
+
+
+def test_presence_integration_wires_app_focus_hook_into_adapter():
+    import inspect
+
+    source = inspect.getsource(PresenceBuddyMixin.__init__)
+
+    assert "on_focus_changed=self._on_presence_app_focus_changed" in source
