@@ -763,3 +763,18 @@ def test_resumed_work_discards_queued_agent_lines(buddy_type, timers) -> None:
 
     discarded = {call.args[0] for call in buddy._ambient_presence_engine.discard.call_args_list}
     assert discarded == {"agent_needs_input", "agent_finished"}
+
+
+@BUDDY_TYPES
+def test_a_failing_tick_lets_the_next_event_rearm_the_poll(buddy_type, timers) -> None:
+    buddy = _agent_buddy(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._agent_tracker.poll = Mock(side_effect=RuntimeError("boom"))
+
+    assert buddy._agent_tick() is GLib.SOURCE_REMOVE
+    assert buddy._agent_source_id is None
+
+    buddy._agent_tracker.poll = Mock(return_value=[])
+    buddy.receive_agent_event("activity", TOKEN)
+    assert buddy._agent_source_id is not None
+    assert len(timers.armed) == 2

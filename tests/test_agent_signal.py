@@ -290,3 +290,34 @@ def test_bridge_never_imports_gi_or_argparse() -> None:
 
     for forbidden in ("import gi", "from gi", "argparse", "print("):
         assert forbidden not in source
+
+
+def test_main_swallows_keyboard_interrupt(capsys) -> None:
+    run = RecordingRun(error=KeyboardInterrupt())
+
+    assert agent_signal.main(["working"], stdin=_pipe_with(b"{}"), run=run, which=_found) == 0
+    assert capsys.readouterr() == ("", "")
+
+
+def test_ctrl_c_while_waiting_on_stdin_still_exits_quietly() -> None:
+    import signal
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [sys.executable, "-m", "mochi.agent_signal", "working"],
+        stdin=subprocess.PIPE,  # never written or closed: the bridge waits
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, "PYTHONPATH": str(root / "src"), "PATH": ""},
+    )
+    try:
+        time.sleep(0.2)
+        process.send_signal(signal.SIGINT)
+        stdout, stderr = process.communicate(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+
+    assert process.returncode == 0
+    assert (stdout, stderr) == (b"", b"")

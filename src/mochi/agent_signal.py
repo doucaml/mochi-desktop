@@ -16,6 +16,7 @@ import json
 import os
 import selectors
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -124,6 +125,13 @@ def main(
     which: Callable[[str], str | None] = shutil.which,
     stdin_deadline_seconds: float = STDIN_DEADLINE_SECONDS,
 ) -> int:
+    if argv is None:
+        # Running as the hook command: a Ctrl+C aimed at the agent must not
+        # print a traceback or exit non-zero. The run ends within ~2 s anyway.
+        try:
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+        except (OSError, ValueError):
+            pass
     try:
         parsed = parse_args(sys.argv[1:] if argv is None else argv)
         if parsed is None:
@@ -145,7 +153,8 @@ def main(
             timeout=PROCESS_TIMEOUT_SECONDS,
             check=False,
         )
-    except Exception:
+    except BaseException:
+        # Includes KeyboardInterrupt: whatever happens, stay silent and exit 0.
         pass
     return 0
 

@@ -163,11 +163,19 @@ class AgentCoworkMixin:
         if getattr(self, "_presence_shutting_down", False):
             self._agent_source_id = None
             return GLib.SOURCE_REMOVE
-        tracker = self._agent_tracker
-        if tracker is not None:
-            self._apply_agent_edges(tracker.poll())
-        else:
-            self._try_agent_beat()
+        try:
+            tracker = self._agent_tracker
+            if tracker is not None:
+                self._apply_agent_edges(tracker.poll())
+            else:
+                self._try_agent_beat()
+        except Exception:
+            # Never leave a dead source id behind: the next event re-arms.
+            self._agent_source_id = None
+            logger = getattr(self, "_logger", None)
+            if logger is not None:
+                logger.exception("[agent] poll failed")
+            return GLib.SOURCE_REMOVE
         if self._agent_work_pending():
             return GLib.SOURCE_CONTINUE
         self._agent_source_id = None
