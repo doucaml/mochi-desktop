@@ -27,18 +27,28 @@ class TerminalCoworkMixin:
         self._terminal_coworking_active = False
         super().__init__(*args, **kwargs)
 
+    def _terminal_cowork_context_live(self) -> bool:
+        """Whether something currently calls for the terminal laptop.
+
+        A focused terminal does. ``AgentCoworkMixin`` extends this so a working
+        coding agent does too; every liveness check here goes through it.
+        """
+        return self._presence_app_category == "terminal"
+
     def _on_presence_app_category_changed(self, category: str) -> None:
         previous = self._presence_app_category
         super()._on_presence_app_category_changed(category)
 
-        if previous == "terminal" and category != "terminal":
+        if not self._terminal_cowork_context_live() and (
+            previous == "terminal" or self._terminal_coworking_active
+        ):
             self._stop_terminal_coworking()
         if category == "terminal":
             self._schedule_terminal_coworking()
 
     def _on_user_active(self) -> None:
         super()._on_user_active()
-        if self._presence_app_category == "terminal":
+        if self._terminal_cowork_context_live():
             self._schedule_terminal_coworking()
 
     def _on_typing_stopped(self) -> None:
@@ -46,7 +56,7 @@ class TerminalCoworkMixin:
         # terminal itself is still focused. Focus, not keystroke cadence, owns
         # this contextual companion state.
         if (
-            self._presence_app_category == "terminal"
+            self._terminal_cowork_context_live()
             and self.state.current is MochiState.TYPING
         ):
             self._ambient_presence_engine.record_typing_stopped()
@@ -68,7 +78,7 @@ class TerminalCoworkMixin:
         self._cancel_terminal_cowork_source()
         if (
             self._presence_shutting_down
-            or self._presence_app_category != "terminal"
+            or not self._terminal_cowork_context_live()
             or self._user_idle
         ):
             return
@@ -81,7 +91,7 @@ class TerminalCoworkMixin:
         self._terminal_cowork_source_id = None
         if (
             self._presence_shutting_down
-            or self._presence_app_category != "terminal"
+            or not self._terminal_cowork_context_live()
             or self._user_idle
             or self._context_menu_open
         ):
@@ -149,7 +159,7 @@ class TerminalCoworkMixin:
                 self._pending_animation = None
                 if (
                     self._terminal_coworking_active
-                    and self._presence_app_category == "terminal"
+                    and self._terminal_cowork_context_live()
                     and not self._presence_shutting_down
                     and not self._user_idle
                     and self.state.current is MochiState.TYPING
@@ -166,7 +176,7 @@ class TerminalCoworkMixin:
                 self._pending_animation = None
                 if (
                     self._terminal_coworking_active
-                    and self._presence_app_category == "terminal"
+                    and self._terminal_cowork_context_live()
                     and not self._presence_shutting_down
                     and not self._user_idle
                     and self.state.current is MochiState.TYPING
@@ -224,7 +234,7 @@ class TerminalCoworkMixin:
 
         if self._presence_app_category == "vscode":
             self._schedule_vscode_coworking()
-        elif self._presence_app_category == "terminal":
+        elif self._terminal_cowork_context_live():
             self._schedule_terminal_coworking()
         elif self._user_idle:
             self._begin_sleep()
@@ -235,7 +245,7 @@ class TerminalCoworkMixin:
 
     def _maybe_resume_terminal_coworking(self) -> bool:
         if (
-            self._presence_app_category != "terminal"
+            not self._terminal_cowork_context_live()
             or self._user_idle
             or self.state.current is not MochiState.IDLE
             or self._context_menu_open
