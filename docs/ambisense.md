@@ -66,6 +66,23 @@ the session bus.
 AmbiSense is a local rule-based behavior engine, not an LLM or cloud AI
 service.
 
+## Agent Companion
+
+Coding agents such as Claude Code and Codex can tell Mochi when they are
+working, waiting on a permission prompt, or done, so he can cowork alongside
+them ([setup](agent-companion.md)). This is not an LLM integration: Mochi
+calls no AI service and makes no network requests.
+
+The agent's own hook runs the local `mochi-agent-signal` command. It reads the
+hook payload only to take the session id, and sends Mochi one allow-listed
+word plus a one-way 16-character hash of that id. Prompts, commands, paths,
+and replies are discarded and never reach Mochi.
+
+The command calls Mochi's `agent-event` application action over the session
+bus. Mochi validates both values again before using them. Like the helper's
+signals, any process running as the same user can send these events; the
+worst one can do is make Mochi open his laptop, wave, or bounce.
+
 ## Session return
 
 `SessionSignalMonitor` observes logind's `PrepareForSleep` signal and the

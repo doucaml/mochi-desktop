@@ -181,6 +181,21 @@ Use this checklist for interaction/state changes and before release checkpoints.
 - [ ] No curiosity during a Focus session's focus phase or while Focus setup is open (breaks and pauses follow the normal rules); reactions return after the session ends
 - [ ] QA note (owner judgment): closing Mochi's own menu, Pocket, or Focus windows hands focus back to another window; observe whether he investigates and whether that feels right
 
+## Agent Companion
+
+- [ ] Agent work opens the laptop once and does not replay on repeated `working` / `activity` events
+- [ ] The laptop stays open while any agent works and closes when the last one stops
+- [ ] A quick permission approval (< 10 s) produces no wave and no laptop flicker
+- [ ] A long-waiting permission prompt produces one wave and at most one line, never repeated for the same wait
+- [ ] Only runs ≥ 60 s celebrate; denials and `/clear` do not
+- [ ] Interrupted turns recover on the next prompt or after 15 minutes; no stuck laptop
+- [ ] Focus, sleep, quiet mode, ambient reactions off, menu, and drag behave as for curiosity; Mochi is never woken for an agent
+- [ ] Terminal → VS Code → browser while an agent works: laptop closes, VS Code coworking takes over, laptop returns; `typing_outro` never plays over terminal art
+- [ ] Dragging Mochi during agent coworking recovers to the laptop
+- [ ] With Mochi not running, agent hooks produce no errors or delay
+- [ ] No agent events are handled after Mochi stops
+- [ ] `mochi-agent-signal` prints nothing in any case (hook stdout can reach the agent's context)
+
 ## AmbiSense Helper Lifecycle (#58)
 
 Automated coverage: `python -m pytest tests/test_helper_lifecycle.py`.

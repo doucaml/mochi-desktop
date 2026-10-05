@@ -4,6 +4,20 @@ Notable user-facing changes to Mochi are tracked here.
 
 Mochi is still in early public alpha, so behavior, configuration, and compatibility details may change between prereleases.
 
+## Unreleased
+
+### Added
+
+- Mochi can keep you company while a coding agent works. Point Claude Code's
+  or Codex's hooks at the new `mochi-agent-signal` command and he opens his
+  laptop while the agent is busy, waves once if it has been waiting on a
+  permission prompt for more than about ten seconds, and does a little bounce
+  when a run of a minute or more finishes. Quick turns stay quiet, he never
+  wakes up for an agent, and he keeps quiet during Focus. The agent only ever
+  tells Mochi one word and an anonymous session hash, never your prompt,
+  files, commands, or its replies, and Mochi makes no network requests. See
+  [Agent Companion](docs/agent-companion.md) for setup.
+
 ## 0.4.1 — Stabilization & Portability
 
 Mochi notices where your attention goes, and stays animated and updatable
