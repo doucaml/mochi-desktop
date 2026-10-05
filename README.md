@@ -5,15 +5,7 @@
 **v0.4 · Pocket & Polish**
 
 ### A tiny Linux desktop buddy that grows with you.
-
-
-
-Seeing Mochi pop up in the Linux community has been surreal. 💚
-
-[![Watch Mochi on YouTube](https://img.youtube.com/vi/fCe5UqQBj9I/maxresdefault.jpg)](https://www.youtube.com/watch?v=fCe5UqQBj9I)
-
-> A community-made look at Mochi.  
-> **Watch on YouTube →**
+<img width="800" height="450" alt="ezgif-6a33926057e31dec" src="https://github.com/user-attachments/assets/8170601e-7e94-46e6-b664-c95a8b1766cd" />
 
 
 Mochi lives quietly on your Linux desktop — wandering, reacting, working beside
