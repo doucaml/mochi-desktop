@@ -5,8 +5,10 @@ from __future__ import annotations
 from gi.repository import GLib
 
 from mochi.agent_activity import AgentActivityTracker, AgentEdge
+from mochi.state import MochiState
 
 from .curiosity import _boottime_seconds
+from .terminal_cowork import TerminalCoworkMixin
 
 
 class AgentCoworkMixin:
@@ -28,6 +30,13 @@ class AgentCoworkMixin:
     AGENT_BEAT_TTL_SECONDS = 30.0
     AGENT_NEEDS_INPUT_BEAT = "wave"
     AGENT_FINISHED_BEAT = "excited"
+    _TERMINAL_ART = frozenset(
+        (
+            TerminalCoworkMixin.TERMINAL_INTRO_ANIMATION,
+            TerminalCoworkMixin.TERMINAL_LOOP_ANIMATION,
+            TerminalCoworkMixin.TERMINAL_OUTRO_ANIMATION,
+        )
+    )
 
     # Class-level defaults: every value is immutable, and some tests build
     # production buddies with ``__new__`` without running mixin initializers.
@@ -57,16 +66,37 @@ class AgentCoworkMixin:
         self._ensure_agent_source()
 
     def _terminal_cowork_context_live(self) -> bool:
-        if super()._terminal_cowork_context_live():
-            return True
+        return super()._terminal_cowork_context_live() or self._agents_alone_keep_laptop_live()
+
+    def _agents_alone_keep_laptop_live(self) -> bool:
+        """Working agents, not a focused terminal, are why the laptop is live."""
+        if self._presence_app_category in ("terminal", "vscode"):
+            # Focused VS Code keeps its own coworking: both claim TYPING, so
+            # the laptop yields and returns through the normal resume chain.
+            return False
         tracker = self._agent_tracker
-        # Focused VS Code keeps its own coworking: both claim TYPING, so the
-        # laptop yields and returns through the normal resume chain.
-        return (
-            tracker is not None
-            and self._presence_app_category != "vscode"
-            and tracker.working
-        )
+        return tracker is not None and tracker.working
+
+    def _on_typing_stopped(self) -> None:
+        if not self._agents_alone_keep_laptop_live():
+            super()._on_typing_stopped()
+            return
+        if (
+            self.state.current is MochiState.TYPING
+            and self._current_animation in self._TERMINAL_ART
+        ):
+            # The agent's laptop stays open (terminal hold below), but the
+            # user's typing burst is over: stop typing-based bond XP rather
+            # than let it tick for the whole agent run.
+            finish_bond_typing = getattr(self, "_finish_bond_typing_session", None)
+            if callable(finish_bond_typing):
+                finish_bond_typing()
+            super()._on_typing_stopped()
+            return
+        # Generic typing art: run the normal typing stop past the terminal
+        # hold. The resume chain then reopens the laptop, or resumes video,
+        # which outranks it.
+        super(TerminalCoworkMixin, self)._on_typing_stopped()
 
     def _apply_agent_edges(self, edges: list[AgentEdge]) -> None:
         engine = getattr(self, "_ambient_presence_engine", None)

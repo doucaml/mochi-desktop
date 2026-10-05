@@ -639,3 +639,114 @@ def test_agent_run_end_to_end_through_real_terminal_coworking(buddy_type, timers
     buddy._play_idle_beat.assert_called_with("excited")
     assert buddy._agent_pending_beat is None
     buddy._ambient_presence_engine.emit.assert_called_once_with("agent_finished")
+
+
+# -- Review fixes: typing stop, category changes with agents --------------------
+
+
+def _working_agent_buddy(buddy_type, *, category="browser", **kwargs):
+    buddy = _agent_buddy(buddy_type, category=category, **kwargs)
+    buddy.receive_agent_event("working", TOKEN)
+    buddy._schedule_terminal_coworking.reset_mock()
+    return buddy
+
+
+@BUDDY_TYPES
+def test_agent_laptop_ends_typing_bond_xp_when_the_user_stops_typing(
+    buddy_type, timers, monkeypatch
+) -> None:
+    from mochi.presence.bond_meter import BondMeterMixin
+
+    bond_stop = Mock()
+    monkeypatch.setattr(BondMeterMixin, "_on_typing_stopped", bond_stop)
+    buddy = _working_agent_buddy(
+        buddy_type, state=MochiState.TYPING, animation="terminal_loop", active=True
+    )
+    buddy._finish_bond_typing_session = Mock()
+
+    buddy._on_typing_stopped()
+
+    buddy._finish_bond_typing_session.assert_called_once_with()
+    assert buddy._terminal_coworking_active is True  # the laptop stays open
+    bond_stop.assert_not_called()
+
+
+@BUDDY_TYPES
+def test_agent_does_not_hold_generic_typing_art(buddy_type, timers, monkeypatch) -> None:
+    from mochi.presence.bond_meter import BondMeterMixin
+
+    bond_stop = Mock()
+    monkeypatch.setattr(BondMeterMixin, "_on_typing_stopped", bond_stop)
+    buddy = _working_agent_buddy(buddy_type, state=MochiState.TYPING, animation="typing_loop")
+
+    buddy._on_typing_stopped()
+
+    # The normal typing stop runs past the terminal hold; the resume chain
+    # then reopens the laptop, or resumes video, which outranks it.
+    bond_stop.assert_called_once_with()
+    assert buddy._terminal_coworking_active is False
+
+
+@BUDDY_TYPES
+def test_focused_terminal_typing_stop_is_unchanged(buddy_type, timers, monkeypatch) -> None:
+    from mochi.presence.bond_meter import BondMeterMixin
+
+    bond_stop = Mock()
+    monkeypatch.setattr(BondMeterMixin, "_on_typing_stopped", bond_stop)
+    buddy = _agent_buddy(
+        buddy_type, category="terminal", state=MochiState.TYPING, animation="terminal_loop", active=True
+    )
+    buddy._finish_bond_typing_session = Mock()
+
+    buddy._on_typing_stopped()
+
+    buddy._finish_bond_typing_session.assert_not_called()
+    bond_stop.assert_not_called()
+    assert buddy._terminal_coworking_active is True
+
+
+@BUDDY_TYPES
+def test_leaving_the_terminal_keeps_the_agent_laptop(buddy_type, timers) -> None:
+    buddy = _working_agent_buddy(
+        buddy_type, category="terminal", state=MochiState.TYPING, animation="terminal_loop", active=True
+    )
+
+    TerminalCoworkMixin._on_presence_app_category_changed(buddy, "browser")
+
+    buddy._stop_terminal_coworking.assert_not_called()
+
+
+@BUDDY_TYPES
+def test_vscode_focus_closes_the_agent_laptop_from_any_app(buddy_type, timers) -> None:
+    # The laptop is open for the agent while a browser is focused; the stop
+    # must not depend on having just left the terminal.
+    buddy = _working_agent_buddy(
+        buddy_type, state=MochiState.TYPING, animation="terminal_loop", active=True
+    )
+
+    TerminalCoworkMixin._on_presence_app_category_changed(buddy, "vscode")
+
+    buddy._stop_terminal_coworking.assert_called_once_with()
+
+
+@BUDDY_TYPES
+def test_leaving_vscode_reopens_the_agent_laptop(buddy_type, timers) -> None:
+    buddy = _working_agent_buddy(buddy_type, category="vscode")
+
+    TerminalCoworkMixin._on_presence_app_category_changed(buddy, "browser")
+
+    buddy._schedule_terminal_coworking.assert_called_once_with()
+
+
+@BUDDY_TYPES
+def test_switching_apps_while_the_agent_laptop_is_open_does_not_restart_it(
+    buddy_type, timers
+) -> None:
+    buddy = _working_agent_buddy(
+        buddy_type, state=MochiState.TYPING, animation="terminal_loop", active=True
+    )
+
+    TerminalCoworkMixin._on_presence_app_category_changed(buddy, "editor")
+
+    buddy._schedule_terminal_coworking.assert_not_called()
+    buddy._stop_terminal_coworking.assert_not_called()

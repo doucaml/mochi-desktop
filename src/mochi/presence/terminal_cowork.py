@@ -43,7 +43,9 @@ class TerminalCoworkMixin:
             previous == "terminal" or self._terminal_coworking_active
         ):
             self._stop_terminal_coworking()
-        if category == "terminal":
+        if category == "terminal" or (
+            self._terminal_cowork_context_live() and not self._terminal_coworking_active
+        ):
             self._schedule_terminal_coworking()
 
     def _on_user_active(self) -> None:
