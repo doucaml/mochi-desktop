@@ -554,6 +554,57 @@
       "fps": 8.333333333333334,
       "loop": false
     },
+    "agent_intro": {
+      "frames": [
+        "agent/agent_intro_01.png",
+        "agent/agent_intro_02.png",
+        "agent/agent_intro_03.png",
+        "agent/agent_intro_04.png",
+        "agent/agent_intro_05.png",
+        "agent/agent_intro_06.png",
+        "agent/agent_intro_07.png"
+      ],
+      "frame_count": 7,
+      "fps": 8.333333333333334,
+      "loop": false
+    },
+    "agent_loop": {
+      "frames": [
+        "agent/agent_loop_01.png",
+        "agent/agent_loop_02.png",
+        "agent/agent_loop_03.png",
+        "agent/agent_loop_04.png",
+        "agent/agent_loop_05.png",
+        "agent/agent_loop_06.png",
+        "agent/agent_loop_07.png",
+        "agent/agent_loop_08.png",
+        "agent/agent_loop_09.png",
+        "agent/agent_loop_10.png",
+        "agent/agent_loop_11.png",
+        "agent/agent_loop_12.png",
+        "agent/agent_loop_13.png",
+        "agent/agent_loop_14.png",
+        "agent/agent_loop_15.png",
+        "agent/agent_loop_16.png",
+        "agent/agent_loop_17.png",
+        "agent/agent_loop_18.png"
+      ],
+      "frame_count": 18,
+      "fps": 8.333333333333334,
+      "loop": true
+    },
+    "agent_outro": {
+      "frames": [
+        "agent/agent_outro_01.png",
+        "agent/agent_outro_02.png",
+        "agent/agent_outro_03.png",
+        "agent/agent_outro_04.png",
+        "agent/agent_outro_05.png"
+      ],
+      "frame_count": 5,
+      "fps": 8.333333333333334,
+      "loop": false
+    },
     "fedora_intro": {
       "frames": [
         "fedora_mode/fedora_mode_intro_0001.png",
