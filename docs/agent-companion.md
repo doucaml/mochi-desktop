@@ -47,7 +47,7 @@ Add these hooks to `~/.claude/settings.json`. If the file already has a
   "hooks": {
     "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "\"$HOME/.local/bin/mochi-agent-signal\" working", "async": true}]}],
     "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "\"$HOME/.local/bin/mochi-agent-signal\" activity", "async": true}]}],
-    "PermissionRequest": [{"matcher": "*", "hooks": [{"type": "command", "command": "\"$HOME/.local/bin/mochi-agent-signal\" needs_input", "async": true}]}],
+    "Notification": [{"matcher": "permission_prompt", "hooks": [{"type": "command", "command": "\"$HOME/.local/bin/mochi-agent-signal\" prompt_waiting", "async": true}]}],
     "Stop": [{"hooks": [{"type": "command", "command": "\"$HOME/.local/bin/mochi-agent-signal\" finished", "async": true}]}],
     "SessionEnd": [{"hooks": [{"type": "command", "command": "\"$HOME/.local/bin/mochi-agent-signal\" ended", "async": true}]}]
   }

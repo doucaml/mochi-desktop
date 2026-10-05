@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import pytest
 from gi.repository import GLib
 
+from mochi.agent_activity import AgentActivityTracker
 from mochi.app import MochiApplication
 from mochi.config import ConfigStore
 from mochi.presence import terminal_cowork
@@ -18,6 +19,7 @@ from mochi.sprites import ANIMATIONS
 from mochi.state import MochiState, StateMachine
 
 TOKEN = "0123456789abcdef"
+GRACE = AgentActivityTracker.NEEDS_INPUT_GRACE_SECONDS
 BUDDY_TYPES = pytest.mark.parametrize("buddy_type", (PresenceBuddy, PresenceX11Buddy))
 
 
@@ -408,7 +410,7 @@ def test_unanswered_prompt_waves_once_and_speaks(buddy_type, timers) -> None:
     buddy.receive_agent_event("working", TOKEN)
     buddy.receive_agent_event("needs_input", TOKEN)
 
-    buddy._agent_now.now += 10.0
+    buddy._agent_now.now += GRACE
     buddy._agent_tick()
 
     buddy._ambient_presence_engine.emit.assert_called_once_with("agent_needs_input")
@@ -421,19 +423,35 @@ def test_unanswered_prompt_waves_once_and_speaks(buddy_type, timers) -> None:
 
 
 @BUDDY_TYPES
-def test_quick_approval_stays_invisible(buddy_type, timers) -> None:
+def test_quickly_approved_long_command_stays_invisible_within_grace(buddy_type, timers) -> None:
+    # Codex: PostToolUse only arrives once the approved command finishes.
     buddy = _agent_buddy(buddy_type)
     buddy.receive_agent_event("working", TOKEN)
     buddy.receive_agent_event("needs_input", TOKEN)
-    buddy._agent_now.now += 4.0
+    buddy._agent_now.now += 3.0  # approved; the command now runs for a while
+    buddy._agent_tick()
+    buddy._agent_now.now += 40.0
+    buddy._agent_tick()
     buddy.receive_agent_event("activity", TOKEN)
 
-    buddy._agent_now.now += 30.0
+    buddy._agent_now.now += 60.0
     buddy._agent_tick()
 
     buddy._play_idle_beat.assert_not_called()
     buddy._ambient_presence_engine.emit.assert_not_called()
     buddy._stop_terminal_coworking.assert_not_called()
+
+
+@BUDDY_TYPES
+def test_claude_prompt_still_waiting_waves_at_once(buddy_type, timers) -> None:
+    buddy = _agent_buddy(buddy_type)
+    buddy.receive_agent_event("working", TOKEN)
+
+    buddy.receive_agent_event("prompt_waiting", TOKEN)
+
+    buddy._stop_terminal_coworking.assert_called_once_with()
+    buddy._ambient_presence_engine.emit.assert_called_once_with("agent_needs_input")
+    buddy._play_idle_beat.assert_called_once_with("wave")
 
 
 @BUDDY_TYPES
@@ -495,7 +513,7 @@ def test_newer_beat_replaces_an_older_one(buddy_type, timers) -> None:
     buddy._agent_now.now += 61.0
     buddy.receive_agent_event("finished", TOKEN)
     buddy.receive_agent_event("needs_input", other)
-    buddy._agent_now.now += 10.0
+    buddy._agent_now.now += GRACE
 
     buddy._agent_tick()
 

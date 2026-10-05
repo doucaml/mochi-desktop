@@ -14,7 +14,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-AGENT_EVENTS = frozenset({"working", "activity", "needs_input", "finished", "ended"})
+AGENT_EVENTS = frozenset(
+    {"working", "activity", "needs_input", "prompt_waiting", "finished", "ended"}
+)
 AGENT_TOKEN_PATTERN = re.compile(r"[0-9a-f]{16}")
 
 
@@ -36,13 +38,15 @@ class _Session:
 class AgentActivityTracker:
     """Turn agent lifecycle words into presentation edges.
 
-    A session is working, or waiting on a permission prompt. Waiting still
-    counts as working for a short grace period, so a quick approval never
-    closes and reopens Mochi's laptop. Finished and ended sessions are dropped;
-    silent ones go stale.
+    A session is working, or waiting on a permission prompt. ``needs_input``
+    means a prompt is about to show; it still counts as working for a grace
+    period, because no hook fires when the user approves: ``activity`` only
+    arrives once the approved tool finishes. ``prompt_waiting`` means the agent
+    itself says the prompt is still unanswered, so it nudges at once. Finished
+    and ended sessions are dropped; silent ones go stale.
     """
 
-    NEEDS_INPUT_GRACE_SECONDS = 10.0
+    NEEDS_INPUT_GRACE_SECONDS = 45.0
     CELEBRATE_MIN_RUN_SECONDS = 60.0
     SESSION_STALE_SECONDS = 900.0
     MAX_SESSIONS = 16
@@ -78,6 +82,9 @@ class AgentActivityTracker:
             if session is None:
                 self._admit(token, _Session(run_started_at=now, last_seen_at=now))
             else:
+                # Every prompt is a new run: an interrupted turn sends no
+                # finish, and its length must not count toward the next one.
+                session.run_started_at = now
                 session.last_seen_at = now
                 self._stop_waiting(session)
         elif event == "activity":
@@ -94,6 +101,16 @@ class AgentActivityTracker:
             if session.waiting_since is None:
                 session.waiting_since = now
                 session.nudged = False
+        elif event == "prompt_waiting":
+            if session is None:
+                session = _Session(run_started_at=now, last_seen_at=now)
+                self._admit(token, session)
+            session.last_seen_at = now
+            if not session.nudged:
+                # The agent says the prompt is still unanswered: no grace left.
+                session.waiting_since = now - self.NEEDS_INPUT_GRACE_SECONDS
+                session.nudged = True
+                edges.append(AgentEdge.NEEDS_INPUT)
         elif event == "finished":
             if session is not None:
                 del self._sessions[token]
