@@ -38,6 +38,8 @@ fi
 rm -f "$LAUNCHER" "$UPDATE_LAUNCHER" "$UNINSTALL_LAUNCHER" "$AGENT_SIGNAL_LAUNCHER" "$DESKTOP_FILE" "$ICON_FILE" "$AUTOSTART_FILE"
 rm -rf "$EXTENSION_DIR"
 
+echo "If you set up Agent Companion hooks, remove them from ~/.claude/settings.json and ~/.codex/hooks.json."
+
 if $PURGE; then
     rm -rf "$CONFIG_HOME/mochi"
     echo "Mochi and saved settings were removed."

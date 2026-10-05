@@ -185,10 +185,13 @@ Use this checklist for interaction/state changes and before release checkpoints.
 
 - [ ] Agent work opens the laptop once and does not replay on repeated `working` / `activity` events
 - [ ] The laptop stays open while any agent works and closes when the last one stops
-- [ ] A quick permission approval (< 10 s) produces no wave and no laptop flicker
-- [ ] A long-waiting permission prompt produces one wave and at most one line, never repeated for the same wait
-- [ ] Only runs ≥ 60 s celebrate; denials and `/clear` do not
-- [ ] Interrupted turns recover on the next prompt or after 15 minutes; no stuck laptop
+- [ ] Claude: a permission prompt answered within ~6 s produces no wave, even when the approved command then runs for minutes; one left unanswered waves once
+- [ ] Codex: a prompt answered within 45 s whose command finishes inside that window produces no wave and no laptop flicker
+- [ ] A long-waiting permission prompt produces one wave and at most one line, never repeated for the same wait; no "waiting" line is spoken after it was answered
+- [ ] Only runs ≥ 60 s celebrate; denials, `/clear`, and a quick turn after an interrupted one do not
+- [ ] Interrupted turns recover when the next turn finishes or after 15 minutes; no stuck laptop
+- [ ] Video playing while an agent works: typing in the browser and stopping returns Mochi to watching, not stuck typing art
+- [ ] Typing bond XP stops when you stop typing, even while the agent laptop stays open
 - [ ] Focus, sleep, quiet mode, ambient reactions off, menu, and drag behave as for curiosity; Mochi is never woken for an agent
 - [ ] Terminal → VS Code → browser while an agent works: laptop closes, VS Code coworking takes over, laptop returns; `typing_outro` never plays over terminal art
 - [ ] Dragging Mochi during agent coworking recovers to the laptop

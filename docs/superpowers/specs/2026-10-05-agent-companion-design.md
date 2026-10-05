@@ -4,7 +4,7 @@
 
 **Builds on:** terminal coworking (`src/mochi/presence/terminal_cowork.py`), the standing-idle beat owner (`src/mochi/presence/idle_look.py`), and the AmbiSense privacy model (`docs/ambisense.md`)
 
-**Status:** design draft, awaiting maintainer approval. No implementation yet.
+**Status:** approved and implemented on `claude/agent-companion-spec` (#176). The [Post-review amendments](#post-review-amendments-2026-10-05) override the text above them.
 
 ## Purpose
 
@@ -47,13 +47,14 @@ Each agent runs `mochi-agent-signal <event>` from its hooks. There are five even
 |---|---|---|---|
 | `working` | `UserPromptSubmit` | `UserPromptSubmit` (0.116) | A turn started. |
 | `activity` | `PostToolUse` | `PostToolUse` (0.117) | Still alive. After a permission prompt, this means the user answered. |
-| `needs_input` | `PermissionRequest` | `PermissionRequest` (0.122) | The agent is about to ask the user for permission. |
+| `needs_input` | — | `PermissionRequest` (0.122) | The agent is about to ask the user for permission. |
+| `prompt_waiting` | `Notification` (`permission_prompt`) | — | A permission prompt is still unanswered (Claude Code: ~6 s with no typing). |
 | `finished` | `Stop` | `Stop` (0.114) | The turn ended normally. |
 | `ended` | `SessionEnd` | `SessionEnd` (0.145), `Interrupt` (0.150) | The session closed (`/clear`, exit, logout, resume), or, in Codex, the user interrupted the turn. |
 
 Facts about these hooks:
 - **Claude Code `Stop`** does not fire when the user interrupts a turn, and Claude Code has no interrupt hook.
-- **Claude Code `PermissionRequest`** fires only when a permission dialog is about to be shown, not for auto-allowed tools.
+- **Claude Code `Notification` with the `permission_prompt` matcher** fires only while a permission prompt is still unanswered, after about six seconds without typing (in SDK hosts such as the VS Code extension: about six seconds after the request, unless it was answered sooner).
 - **Codex `Interrupt`** maps to `ended`, so an interrupted Codex turn closes the laptop right away instead of waiting for stale cleanup.
 
 Sources are under [Verified facts](#verified-facts).
@@ -72,7 +73,7 @@ Mochi keeps a small in-memory record per agent session, keyed by an opaque token
 
 Every event refreshes the session's last-seen time.
 
-**When agents count as working.** Agents are working if any session is `WORKING`, or is `WAITING` and still inside its 10 s grace period. The grace period keeps the laptop from flickering shut and open on a quick approval.
+**When agents count as working.** Agents are working if any session is `WORKING`, or is `WAITING` and still inside its 45 s grace period (`needs_input` only; `prompt_waiting` has no grace). The grace period keeps the laptop from flickering shut and open on a quick approval.
 
 **Edges.** The model reports four edges to the presentation layer:
 - `WORK_STARTED`: agents become working (none → some).
@@ -86,7 +87,7 @@ Every event refreshes the session's last-seen time.
 
 | Constant | Value | Why |
 |---|---|---|
-| `NEEDS_INPUT_GRACE_SECONDS` | 10.0 | Answering within 10 s produces no nudge. Claude Code's own desktop notification waits about 6 s. |
+| `NEEDS_INPUT_GRACE_SECONDS` | 45.0 | Codex only. No hook fires on approval: `activity` arrives once the approved tool finishes, so the grace must outlast typical approved commands. |
 | `CELEBRATE_MIN_RUN_SECONDS` | 60.0 | Quick back-and-forth turns stay quiet. |
 | `SESSION_STALE_SECONDS` | 900.0 | Recovers interrupted turns without cutting off long tool runs. |
 | `MAX_SESSIONS` | 16 | Keeps memory bounded. The least recently seen session is evicted. |
@@ -181,7 +182,7 @@ This was verified on a private session bus with a probe `Gio.Application` (GLib 
 
 The handler validates the event and token again before using them. This adds no bus name, socket, file watch, or teardown beyond the action itself.
 
-**Trust boundary.** Any process running as the same user on the session bus can call this action. That is the same boundary Mochi already accepts for AmbiSense helper signals. The worst a caller can do is make Mochi open his laptop, wave, or bounce, and it is rate-limited by the session cap, the speech cooldowns and the beat TTL. The action cannot read anything, change settings, or reach the filesystem.
+**Trust boundary.** Any process running as the same user on the session bus can call this action. That is the same boundary Mochi already accepts for AmbiSense helper signals. The worst a caller can do is make Mochi open his laptop, wave, or bounce, and speech is rate-limited by the engine cooldowns. Beats have no cooldown of their own; the session cap bounds memory, not frequency. The action cannot read anything, change settings, or reach the filesystem.
 
 ### The bridge never hurts the agent
 
@@ -203,7 +204,7 @@ The handler validates the event and token again before using them. This adds no 
 | Detecting agents by scanning `/proc` or terminal titles | Privacy-adjacent, brittle, and against AmbiSense's title boundary. |
 | Claude Code mods (JavaScript) | Claude-only. Command hooks share one shape with Codex. |
 | The bridge sends nothing (one hook command per event, stdin unread) | Simplest privacy story, but two parallel agents would trample each other's state. Hashing the one id keeps sessions apart without exposing content. |
-| Claude `Notification` (`permission_prompt`) instead of `PermissionRequest` | Claude-only, and it has its own ~6 s delay. `PermissionRequest` matches Codex, and Mochi applies one grace rule for both. |
+| ~~Claude `Notification` (`permission_prompt`) instead of `PermissionRequest`~~ | Originally rejected; **adopted after review** (see amendments): it is the only Claude signal that a prompt is really still unanswered. |
 
 ## Agent setup
 
@@ -377,14 +378,14 @@ AgentCoworkMixin (src/mochi/presence/agent_cowork.py)
 | Mochi is not running | The bridge's `gdbus` call fails in about 10 ms; it exits 0 silently. With `async` hooks, Claude Code is never blocked. |
 | `gdbus` is not installed | `which` finds nothing, and the bridge exits 0. `gdbus` ships in Fedora's `glib2`. |
 | A huge prompt on stdin | It is read and discarded under the deadline. Only `session_id` is taken. |
-| stdin never closes | The 1 s deadline, then the default token. |
+| stdin never closes | The 0.5 s deadline, then the default token. |
 | Async hooks arrive out of order (`activity` after `finished`) | `activity` never creates a session, so a late `activity` cannot reopen the laptop. |
 | The user interrupts a turn (no `Stop`) | The laptop stays open until the next event or the 15-minute stale cleanup. That cleanup is silent. |
 | Two agents in parallel | Separate tokens. The laptop stays open until both stop. Each long finish may celebrate, limited by the engine cooldown and the latest-wins beat. |
-| Permission approved within 10 s | `activity` cancels the wait. No nudge, and the laptop never closed. |
+| Permission approved quickly | Claude: no `permission_prompt` notification, so nothing happens. Codex: `activity` cancels the wait if the approved command finishes within 45 s. |
 | Permission denied | `finished` from a `WAITING` session: no celebration. |
 | Nudge while Mochi is asleep, in Focus, quiet mode, or in a menu | The beat waits or is dropped after its TTL. Speech is governed by the engine gates. Mochi is never woken. |
-| Agent working while the user is idle (away) | No coworking for an empty room. The existing idle gate applies, and Mochi may nap. It reopens on return if the agent is still working. |
+| Agent working while the user is idle (away) | No coworking *starts* for an empty room. If the laptop is already open, Mochi keeps it until the agent stops (`_on_user_idle` already ignores `TYPING`, as for a focused terminal). Typing bond XP stops with the user's last keystroke. |
 | Terminal focused, and the agent finishes | The laptop stays open (the terminal still holds it). The celebration waits for idle, which may never come while in the terminal; it is dropped after 30 s. |
 | Video starts while the agent works | Video outranks coworking (existing rule). The laptop resumes after video if the agent is still working. |
 | Spoofed events from another same-user process | Bounded harmless animations. Validated words, a session cap, cooldowns. |
@@ -492,3 +493,24 @@ New watchlist items:
 - **Async ordering.** It is handled by "only `working` or `needs_input` creates a session". A rare misordering can at worst leave a stale laptop for 15 minutes.
 - **Spoofing on the session bus.** Bounded and harmless (see [Transport](#transport)).
 - **Setup friction.** Hand-merging JSON into two agents' configs, plus Codex's trust step, is the most likely way this feature "doesn't work". The docs carry exact snippets and a one-line `gdbus` reachability check. A packaged Claude Code plugin is the natural follow-up if this proves painful.
+
+## Post-review amendments (2026-10-05)
+
+An adversarial review of the implementation found the following; each is fixed on the branch with tests. These override the text above.
+
+1. **False "needs you" nudges.** `PostToolUse` fires only after an approved tool *finishes*; no hook fires on approval. So a quickly approved slow command was nudged after 10 s.
+   - Claude Code now sends a new sixth word, `prompt_waiting`, from `Notification` with the `permission_prompt` matcher. That notification fires only while the prompt is still unanswered, and it nudges at once. The Claude `PermissionRequest` hook is removed from the snippet.
+   - Codex keeps `PermissionRequest` → `needs_input`, with the grace raised from 10 s to 45 s. An approved Codex command that runs past 45 s can still be nudged. This is documented.
+2. **Run length after interrupts.** Every `working` event restarts the run clock, so a quick turn after an interrupted one (no `Stop`) is not celebrated as long.
+3. **Bond XP during agent runs.** When only agents keep the laptop live, a typing stop ends the bond typing session. The terminal hold no longer swallows it for the whole run.
+4. **Generic typing art held by agents.** With agents alone, generic typing art takes the normal typing stop, bypassing the terminal hold through `super(TerminalCoworkMixin, self)`. The resume chain then reopens the laptop, or resumes video, which outranks it.
+5. **Leaving VS Code while an agent works.** This reschedules the laptop (`live and not active`). Before, it waited for the next idle look.
+6. **Stale lines.** Agent engine events expire after 30 s instead of 120 s. `PresenceEngine.discard()` drops queued agent lines when work resumes.
+7. **Bridge on Ctrl+C.** As the hook command, it ignores SIGINT and catches `BaseException`. It stays silent and exits 0, which a real-SIGINT test verifies.
+8. **Poll robustness.** A failing tick clears its source id, so the next event re-arms the poll.
+9. **Tests.** Agent-side category tests now catch the reviewer's stop-condition mutant (`previous == "terminal"` alone).
+10. **Docs.**
+    - The troubleshooting reaction check works from inside a terminal.
+    - The VS Code note is added.
+    - The uninstaller reminds users to remove their hooks.
+    - The testing and QA lists above that mention 10 s now follow item 1.
